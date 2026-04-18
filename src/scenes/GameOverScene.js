@@ -1,10 +1,12 @@
 import { GAME_WIDTH, GAME_HEIGHT } from '../main.js';
 import { SaveSystem } from '../systems/SaveSystem.js';
+import { Sound } from '../systems/Sound.js';
 
 export class GameOverScene extends Phaser.Scene {
   constructor() { super('GameOver'); }
 
   create(data) {
+    Sound.gameOver();
     this.cameras.main.setBackgroundColor('#1a0a0a');
 
     this.add.text(GAME_WIDTH / 2, 160, 'OUT OF LIVES', {

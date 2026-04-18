@@ -1,10 +1,12 @@
 import { GAME_WIDTH, GAME_HEIGHT } from '../main.js';
 import { SaveSystem } from '../systems/SaveSystem.js';
+import { Sound } from '../systems/Sound.js';
 
 export class VictoryScene extends Phaser.Scene {
   constructor() { super('Victory'); }
 
   create(data) {
+    Sound.victory();
     this.cameras.main.setBackgroundColor('#0f1a10');
 
     this.add.text(GAME_WIDTH / 2, 140, 'VICTORY!', {

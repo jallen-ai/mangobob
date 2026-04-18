@@ -1,3 +1,5 @@
+import { Sound } from '../systems/Sound.js';
+
 export class Monkey extends Phaser.Physics.Arcade.Sprite {
   constructor(scene, x, y) {
     super(scene, x, y, 'monkey');
@@ -32,6 +34,7 @@ export class Monkey extends Phaser.Physics.Arcade.Sprite {
     if (this.health <= 0) {
       this.die();
     } else {
+      Sound.monkeyHit();
       this.state = 'hurt';
       this.stateSince = this.scene.time.now;
     }
@@ -39,6 +42,7 @@ export class Monkey extends Phaser.Physics.Arcade.Sprite {
 
   die() {
     if (!this.active) return;
+    Sound.monkeyScreech();
     const scene = this.scene;
     // Small poof + drop
     const fx = scene.add.image(this.x, this.y, 'splash').setScale(0.4).setAlpha(0.8).setDepth(14);
@@ -140,16 +144,20 @@ export class Boss extends Phaser.Physics.Arcade.Sprite {
     this.setTint(0xff9999);
     this.scene.time.delayedCall(90, () => this.clearTint());
 
+    Sound.bossDamaged();
+
     // Phase transitions
     const ratio = this.health / this.maxHealth;
     if (ratio < 0.66 && this.phase < 2) {
       this.phase = 2;
       this.speed = 80;
+      Sound.bossPhase();
       this.scene.cameras.main.flash(200, 200, 40, 40);
     }
     if (ratio < 0.33 && this.phase < 3) {
       this.phase = 3;
       this.speed = 105;
+      Sound.bossPhase();
       this.scene.cameras.main.flash(250, 220, 60, 20);
     }
 
@@ -161,6 +169,7 @@ export class Boss extends Phaser.Physics.Arcade.Sprite {
   die() {
     if (this.defeated) return;
     this.defeated = true;
+    Sound.bossDefeat();
     const scene = this.scene;
 
     // Boss death sequence: multiple splashes

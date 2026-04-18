@@ -1,3 +1,5 @@
+import { Sound } from '../systems/Sound.js';
+
 export const CHAR_CONFIG = {
   mangobob: {
     key: 'mangobob',
@@ -112,7 +114,10 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
 
     if (this.health <= 0) {
       this.isAlive = false;
+      Sound.playerDie();
       this.emit('died');
+    } else {
+      Sound.playerHurt();
     }
     return true;
   }
@@ -182,6 +187,7 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
       this.dodgeUntil = now + 220;
       this.dodgeCooldownUntil = now + 900;
       this.iFramesUntil = Math.max(this.iFramesUntil, now + 240);
+      Sound.dodge();
       this.scene.tweens.add({
         targets: this,
         alpha: { from: 1, to: 0.5 },

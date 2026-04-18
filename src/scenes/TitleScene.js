@@ -1,5 +1,6 @@
 import { GAME_WIDTH, GAME_HEIGHT } from '../main.js';
 import { SaveSystem } from '../systems/SaveSystem.js';
+import { Sound } from '../systems/Sound.js';
 
 export class TitleScene extends Phaser.Scene {
   constructor() { super('Title'); }
@@ -66,7 +67,7 @@ export class TitleScene extends Phaser.Scene {
 
       text.on('pointerover', () => text.setColor('#ffb347'));
       text.on('pointerout', () => text.setColor('#f5e6c8'));
-      text.on('pointerdown', btn.action);
+      text.on('pointerdown', () => { Sound.menuClick(); btn.action(); });
     });
 
     this.add.text(GAME_WIDTH / 2, GAME_HEIGHT - 30, 'Click a button or press ENTER to start', {

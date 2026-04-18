@@ -4,6 +4,7 @@ import { Companion } from '../entities/Companion.js';
 import { Projectile } from '../entities/Projectile.js';
 import { Monkey, Boss } from '../entities/Enemy.js';
 import { SaveSystem } from '../systems/SaveSystem.js';
+import { Sound } from '../systems/Sound.js';
 import { LEVEL1 } from '../levels/Level1.js';
 
 export class GameScene extends Phaser.Scene {
@@ -115,6 +116,7 @@ export class GameScene extends Phaser.Scene {
     this.input.keyboard.on('keydown-Q', () => this.swapCharacters());
     this.input.keyboard.on('keydown-P', () => this.togglePause());
     this.input.keyboard.on('keydown-R', () => this.tryActivateFury());
+    this.input.keyboard.on('keydown-M', () => { Sound.toggleMute(); });
     this.input.keyboard.on('keydown-ESC', () => this.scene.start('Title'));
 
     // Wave state per zone
@@ -249,8 +251,10 @@ export class GameScene extends Phaser.Scene {
     zs.cleared = true;
 
     // Open gate
+    let gateFound = false;
     this.gates.getChildren().forEach((g) => {
       if (g.zoneId === LEVEL1.zones[zoneIdx].id) {
+        gateFound = true;
         this.tweens.add({
           targets: g,
           alpha: 0,
@@ -258,10 +262,11 @@ export class GameScene extends Phaser.Scene {
           duration: 500,
           onComplete: () => { g.body.enable = false; g.destroy(); },
         });
-        // Drop a golden mango reward
         this.spawnPickup(g.x, g.y + 40, 'golden-mango');
       }
     });
+    if (gateFound) Sound.gateOpen();
+    Sound.zoneCleared();
 
     // Save progress
     this.save = SaveSystem.save({
@@ -346,6 +351,7 @@ export class GameScene extends Phaser.Scene {
       const reach = empowered ? player.cfg.primaryReach * 1.5 : player.cfg.primaryReach;
       this.meleeHit(player, aim, reach, damage);
       player.swingClub(aim, empowered);
+      (empowered ? Sound.furyHit : Sound.swing)();
       this.cameras.main.shake(empowered ? 80 : 40, empowered ? 0.004 : 0.002);
 
       if (empowered) {
@@ -364,6 +370,7 @@ export class GameScene extends Phaser.Scene {
       this.firePlayerProjectile(player, 'mango', aim, {
         speed: 520, damage: player.cfg.primaryDamage, ttl: 800, scale: 0.9, spin: 12,
       });
+      Sound.slingshot();
     }
   }
 
@@ -377,6 +384,7 @@ export class GameScene extends Phaser.Scene {
     this.furyUntil = this.time.now + 6000;
     this.furyCharge = 0;
 
+    Sound.furyActivate();
     const mb = this.mangobob;
     mb.setTint(0xffe24a);
     if (mb.furyAura) {
@@ -425,6 +433,7 @@ export class GameScene extends Phaser.Scene {
     const before = this.furyCharge;
     this.furyCharge = Math.min(this.furyMax, this.furyCharge + amount);
     if (before < this.furyMax && this.furyCharge === this.furyMax) {
+      Sound.furyReady();
       this.cameras.main.flash(180, 255, 220, 80);
       const hint = this.add.text(GAME_WIDTH / 2, 110, 'FURY READY — press R', {
         fontFamily: 'Trebuchet MS', fontSize: '22px', color: '#ffe24a',
@@ -438,16 +447,16 @@ export class GameScene extends Phaser.Scene {
     if (!player.trySecondary(time)) return;
     const aim = player.getAimDirection();
     if (player.charKey === 'mangobob') {
-      // Thrown mango
       this.firePlayerProjectile(player, 'mango', aim, {
         speed: 360, damage: player.cfg.secondaryDamage, ttl: 1000, scale: 1.3, spin: 8,
       });
+      Sound.throw();
     } else {
-      // Grenade arc with splash
       this.firePlayerProjectile(player, 'grenade', aim, {
         speed: 320, damage: 0, ttl: 900, splashRadius: 78, splashDamage: player.cfg.secondaryDamage,
         scale: 1.2, spin: 10, explodeOnImpact: true,
       });
+      Sound.throw();
     }
   }
 
@@ -459,6 +468,7 @@ export class GameScene extends Phaser.Scene {
       speed: 440, damage: player.cfg.heavyDamage, ttl: 1400, splashRadius: 80,
       splashDamage: Math.floor(player.cfg.heavyDamage * 0.5), scale: 1.5, spin: 0,
     });
+    Sound.bazooka();
     this.cameras.main.shake(120, 0.006);
   }
 
@@ -498,6 +508,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   applySplash(proj) {
+    if (proj.fromPlayer) Sound.grenade();
     const enemies = this.enemies.getChildren().concat(this.bossGroup.getChildren());
     enemies.forEach((e) => {
       const d = Phaser.Math.Distance.Between(proj.x, proj.y, e.x, e.y);
@@ -517,14 +528,20 @@ export class GameScene extends Phaser.Scene {
 
   hitEnemy(proj, enemy) {
     if (!proj.active) return;
-    if (proj.damage > 0) enemy.takeDamage(proj.damage, proj);
+    if (proj.damage > 0) {
+      enemy.takeDamage(proj.damage, proj);
+      Sound.mangoSplat();
+    }
     this.checkZoneClear(enemy.zoneIdx);
     proj.explode(true);
   }
 
   hitBoss(proj, boss) {
     if (!proj.active) return;
-    if (proj.damage > 0) boss.takeDamage(proj.damage, proj);
+    if (proj.damage > 0) {
+      boss.takeDamage(proj.damage, proj);
+      Sound.mangoSplat();
+    }
     proj.explode(true);
   }
 
@@ -572,6 +589,7 @@ export class GameScene extends Phaser.Scene {
     this.bossGroup.add(boss);
     boss.zoneIdx = LEVEL1.zones.indexOf(zone);
     this.events.emit('boss-appeared', boss);
+    Sound.bossRoar();
     this.cameras.main.shake(400, 0.01);
     this.events.once('bossDefeated', () => this.onBossDefeated());
   }
@@ -677,10 +695,12 @@ export class GameScene extends Phaser.Scene {
     if (pk.pickupType === 'mango') {
       player.heal(2);
       this.gainFury(1);
+      Sound.mangoPickup();
     } else if (pk.pickupType === 'golden-mango') {
       this.mangoesCollected++;
       [this.mangobob, this.jeff].forEach((p) => p.heal(1));
       this.gainFury(2);
+      Sound.goldenPickup();
     }
     const fx = this.add.image(pk.x, pk.y, 'splash').setScale(0.3).setAlpha(0.7).setDepth(14);
     this.tweens.add({ targets: fx, scale: 0.9, alpha: 0, duration: 260, onComplete: () => fx.destroy() });
