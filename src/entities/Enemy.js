@@ -126,7 +126,7 @@ export class Monkey extends Phaser.Physics.Arcade.Sprite {
 }
 
 export class Boss extends Phaser.Physics.Arcade.Sprite {
-  constructor(scene, x, y) {
+  constructor(scene, x, y, opts = {}) {
     super(scene, x, y, 'boss');
     scene.add.existing(this);
     scene.physics.add.existing(this);
@@ -134,15 +134,26 @@ export class Boss extends Phaser.Physics.Arcade.Sprite {
     this.setCollideWorldBounds(true);
     this.setDepth(9);
 
-    this.maxHealth = 60;
+    this.encounterCount = opts.encounterCount || 0;
+    this.isFinalEncounter = !!opts.isFinalEncounter;
+
+    // Scale HP + speed with each encounter — he gets tougher every time he comes back
+    const hpByEncounter = [60, 85, 110, 150];
+    this.maxHealth = hpByEncounter[Math.min(this.encounterCount, hpByEncounter.length - 1)];
     this.health = this.maxHealth;
     this.phase = 1;
     this.state = 'idle';
     this.stateSince = scene.time.now;
     this.nextAttackAt = scene.time.now + 1200;
     this.knockback = new Phaser.Math.Vector2(0, 0);
-    this.speed = 55;
+    this.speed = 55 + this.encounterCount * 10;
     this.defeated = false;
+    this.escaped = false;
+
+    // Visual differentiation: later encounters get tints/overlays for "battle-scarred"
+    if (this.encounterCount >= 1) this.setTint(0xf8d8b8); // slightly pale
+    if (this.encounterCount >= 2) this.setTint(0xe0a090); // bruised
+    if (this.encounterCount >= 3) this.setTint(0xc06868); // enraged final form
   }
 
   takeDamage(amount, source) {
@@ -180,7 +191,14 @@ export class Boss extends Phaser.Physics.Arcade.Sprite {
   }
 
   die() {
-    if (this.defeated) return;
+    if (this.defeated || this.escaped) return;
+
+    // Not the final encounter? He escapes instead of dying.
+    if (!this.isFinalEncounter) {
+      this.escape();
+      return;
+    }
+
     this.defeated = true;
     Sound.bossDefeat();
     const scene = this.scene;
@@ -207,8 +225,43 @@ export class Boss extends Phaser.Physics.Arcade.Sprite {
     this.body.enable = false;
   }
 
+  escape() {
+    if (this.escaped || this.defeated) return;
+    this.escaped = true;
+    const scene = this.scene;
+    this.setVelocity(0, 0);
+    if (this.body) this.body.enable = false;
+    Sound.bossRoar();
+
+    // Taunt text
+    const taunt = scene.add.text(this.x, this.y - 90, 'You\'ll pay for this!', {
+      fontFamily: 'Trebuchet MS', fontSize: '22px', fontStyle: 'bold',
+      color: '#ffb347', stroke: '#3a2510', strokeThickness: 5,
+    }).setOrigin(0.5).setDepth(100);
+    scene.tweens.add({ targets: taunt, y: this.y - 140, alpha: 0, duration: 1400, onComplete: () => taunt.destroy() });
+
+    // Fly off-screen (up-and-out)
+    scene.tweens.add({
+      targets: this,
+      y: this.y - 260,
+      x: this.x + 180,
+      scale: 0.4,
+      alpha: 0,
+      angle: 360,
+      duration: 1400,
+      ease: 'Quad.easeIn',
+      onComplete: () => {
+        scene.events.emit('bossEscaped', this);
+        this.destroy();
+      },
+    });
+
+    scene.cameras.main.shake(300, 0.006);
+    scene.cameras.main.flash(200, 255, 100, 80);
+  }
+
   update(time, delta, target) {
-    if (this.defeated || !target || !target.isAlive) {
+    if (this.defeated || this.escaped || !target || !target.isAlive) {
       this.setVelocity(0, 0);
       return;
     }
@@ -242,6 +295,8 @@ export class Boss extends Phaser.Physics.Arcade.Sprite {
     const options = ['spread', 'slam'];
     if (this.phase >= 2) options.push('summon');
     if (this.phase >= 3) options.push('barrage');
+    // Shockwave slam unlocks from encounter 2 onwards (he learns new tricks)
+    if (this.encounterCount >= 1) options.push('shockwave');
     const pick = Phaser.Utils.Array.GetRandom(options);
 
     if (pick === 'spread') {
@@ -256,6 +311,9 @@ export class Boss extends Phaser.Physics.Arcade.Sprite {
     } else if (pick === 'barrage') {
       this.scene.bossBarrage(this, target);
       this.nextAttackAt = time + 2800;
+    } else if (pick === 'shockwave') {
+      this.scene.bossShockwave(this, target);
+      this.nextAttackAt = time + 3200;
     }
 
     this.state = 'moving';

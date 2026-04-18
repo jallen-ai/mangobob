@@ -613,13 +613,86 @@ export class GameScene extends Phaser.Scene {
 
   // Boss attacks
   spawnBoss(zone) {
-    const boss = new Boss(this, zone.bounds.x + zone.bounds.width / 2, zone.bounds.y + 240);
+    const encounter = this.save.bossEncounters || 0;
+    // Final arena for now = Level 2 (we have 2 levels until Phase F lands Levels 3+4)
+    // When 4-level campaign exists, change the condition to currentLevelId === 4.
+    const isFinal = this.currentLevelId >= 2;
+    const boss = new Boss(this, zone.bounds.x + zone.bounds.width / 2, zone.bounds.y + 240, {
+      encounterCount: encounter,
+      isFinalEncounter: isFinal,
+    });
     this.bossGroup.add(boss);
     boss.zoneIdx = this.currentLevel.zones.indexOf(zone);
     this.events.emit('boss-appeared', boss);
     Sound.bossRoar();
     this.cameras.main.shake(400, 0.01);
     this.events.once('bossDefeated', () => this.onBossDefeated());
+    this.events.once('bossEscaped', () => this.onBossEscaped());
+  }
+
+  onBossEscaped() {
+    // Count this encounter, open transition (same door mechanic as before)
+    this.save = SaveSystem.save({
+      ...this.save,
+      bossEncounters: (this.save.bossEncounters || 0) + 1,
+      levelId: this.currentLevelId,
+    });
+    this.time.delayedCall(800, () => this.spawnLevelTransitionDoor());
+  }
+
+  bossShockwave(boss, target) {
+    const scene = this;
+    // Boss visibly hops into the air then slams down — telegraph
+    const originalY = boss.y;
+    scene.tweens.add({
+      targets: boss,
+      y: originalY - 40,
+      duration: 300,
+      yoyo: true,
+      ease: 'Quad.easeOut',
+      onComplete: () => {
+        // Impact: shake + expanding ring
+        scene.cameras.main.shake(300, 0.01);
+        Sound.bossPhase();
+        const ring = scene.add.circle(boss.x, originalY + 20, 20, 0xff6a1a, 0)
+          .setStrokeStyle(6, 0xff6a1a).setDepth(20);
+        const ring2 = scene.add.circle(boss.x, originalY + 20, 20, 0xffd070, 0)
+          .setStrokeStyle(3, 0xffd070).setDepth(20);
+
+        const maxRadius = 320;
+        const duration = 650;
+        scene.tweens.add({
+          targets: [ring, ring2],
+          radius: maxRadius,
+          alpha: 0,
+          duration,
+          ease: 'Quad.easeOut',
+          onComplete: () => { ring.destroy(); ring2.destroy(); },
+        });
+
+        // Damage check: as the ring expands, if the player is within a band near
+        // the current radius AND not airborne, they take a hit. One-shot check
+        // per attack to keep it clean.
+        const startTime = scene.time.now;
+        const damageTimer = scene.time.addEvent({
+          delay: 30,
+          repeat: Math.floor(duration / 30),
+          callback: () => {
+            const t = (scene.time.now - startTime) / duration;
+            const r = 20 + (maxRadius - 20) * t;
+            const active = scene.getActive();
+            if (!active.isAlive || active.airborne) return;
+            const d = Phaser.Math.Distance.Between(active.x, active.y, boss.x, originalY + 20);
+            if (Math.abs(d - r) < 22) {
+              if (active.takeDamage(2, boss, scene.time.now)) {
+                scene.events.emit('hud-refresh', scene.getHudState());
+              }
+              damageTimer.remove();
+            }
+          },
+        });
+      },
+    });
   }
 
   bossSpreadShot(boss, target) {
@@ -697,6 +770,7 @@ export class GameScene extends Phaser.Scene {
       mangobobLives: this.mangobobLives, jeffLives: this.jeffLives,
       mangoesCollected: this.mangoesCollected,
       levelId: this.currentLevelId,
+      bossEncounters: (this.save.bossEncounters || 0) + 1,
     });
 
     if (this.currentLevelId === 1) {
