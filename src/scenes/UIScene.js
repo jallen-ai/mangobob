@@ -27,15 +27,19 @@ export class UIScene extends Phaser.Scene {
     this.walletLabel = this.add.text(470, 16, 'WALLET', { fontFamily: 'Trebuchet MS', fontSize: '9px', color: '#b89030' }).setOrigin(0, 0);
     this.walletText = this.add.text(526, 16, '0', { fontFamily: 'Trebuchet MS', fontSize: '10px', color: '#ffe24a' }).setOrigin(0, 0);
 
-    // Fury meter
-    this.furyLabel = this.add.text(600, 16, 'FURY', { fontFamily: 'Trebuchet MS', fontSize: '11px', color: '#ffb347' }).setOrigin(0, 0);
+    // Grenade ammo
+    this.grenadeIcon = this.add.image(550, 34, 'grenade').setScale(1.3);
+    this.grenadeText = this.add.text(568, 34, 'x 3', { fontFamily: 'Trebuchet MS', fontSize: '16px', color: '#ff9b2a', stroke: '#3a2510', strokeThickness: 3 }).setOrigin(0, 0.5);
+
+    // Fury meter (pushed right to make room for grenade count)
+    this.furyLabel = this.add.text(640, 16, 'FURY', { fontFamily: 'Trebuchet MS', fontSize: '11px', color: '#ffb347' }).setOrigin(0, 0);
     this.furyPips = [];
     for (let i = 0; i < 5; i++) {
-      const pip = this.add.circle(608 + i * 14, 42, 5, 0x3a2510).setStrokeStyle(1, 0x6b3a1b);
+      const pip = this.add.circle(648 + i * 14, 42, 5, 0x3a2510).setStrokeStyle(1, 0x6b3a1b);
       this.furyPips.push(pip);
     }
-    this.furyTimerBg = this.add.rectangle(600, 42, 70, 8, 0x3a2510).setOrigin(0, 0.5).setVisible(false);
-    this.furyTimerBar = this.add.rectangle(601, 42, 68, 6, 0xffe24a).setOrigin(0, 0.5).setVisible(false);
+    this.furyTimerBg = this.add.rectangle(640, 42, 70, 8, 0x3a2510).setOrigin(0, 0.5).setVisible(false);
+    this.furyTimerBar = this.add.rectangle(641, 42, 68, 6, 0xffe24a).setOrigin(0, 0.5).setVisible(false);
 
     // Zone name
     this.zoneText = this.add.text(GAME_WIDTH - 20, 36, '', { fontFamily: 'Trebuchet MS', fontSize: '14px', color: '#f5e6c8' }).setOrigin(1, 0.5);
@@ -112,6 +116,12 @@ export class UIScene extends Phaser.Scene {
 
     this.mangoText.setText('x ' + state.mangoes);
     if (this.walletText) this.walletText.setText(String(state.wallet ?? 0));
+    if (this.grenadeText) {
+      const n = state.grenades?.count ?? 0;
+      this.grenadeText.setText('x ' + n);
+      this.grenadeText.setColor(n === 0 ? '#8b5a2b' : '#ff9b2a');
+      if (this.grenadeIcon) this.grenadeIcon.setAlpha(n === 0 ? 0.35 : 1);
+    }
     this.zoneText.setText(state.zoneName);
 
     // Active ring

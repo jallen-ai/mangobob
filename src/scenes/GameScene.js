@@ -32,6 +32,10 @@ export class GameScene extends Phaser.Scene {
     this.furyActive = false;
     this.furyUntil = 0;
 
+    // Grenades are finite per level
+    this.grenadeAmmo = 3;
+    this.grenadeAmmoMax = 3;
+
     // World bounds = the full level width
     const level = this.currentLevel;
     this.physics.world.setBounds(0, 0, level.width, level.height);
@@ -105,7 +109,10 @@ export class GameScene extends Phaser.Scene {
     this.physics.add.collider(this.enemies, this.obstacles);
     this.physics.add.collider(this.bossGroup, this.obstacles);
 
-    this.physics.add.overlap(this.projectilesPlayer, this.obstacles, (p) => p.explode(true), null, this);
+    this.physics.add.overlap(this.projectilesPlayer, this.obstacles, (p, o) => {
+      if (o.breakable) this.damageCrate(o, p.damage || 1);
+      p.explode(true);
+    }, null, this);
     this.physics.add.overlap(this.projectilesEnemy, this.obstacles, (p) => p.explode(true), null, this);
 
     this.physics.add.overlap(this.projectilesPlayer, this.enemies, (p, e) => this.hitEnemy(p, e), null, this);
@@ -170,6 +177,7 @@ export class GameScene extends Phaser.Scene {
 
   placeObstacle(o) {
     const sprite = this.obstacles.create(o.x, o.y, o.type);
+    sprite.obstacleType = o.type;
     sprite.setDepth(o.type === 'tree' ? 15 : 6);
     if (o.type === 'tree') {
       sprite.body.setSize(sprite.width * 0.4, sprite.height * 0.25);
@@ -181,7 +189,38 @@ export class GameScene extends Phaser.Scene {
       sprite.body.setSize(sprite.width * 0.75, sprite.height * 0.85);
       sprite.body.setOffset(sprite.width * 0.12, sprite.height * 0.1);
     }
+    // Destructible crates: smash them for pickups (mostly mangoes)
+    if (o.type === 'crate') { sprite.breakable = true; sprite.crateHealth = 2; }
+    else if (o.type === 'metal-crate') { sprite.breakable = true; sprite.crateHealth = 4; }
     sprite.refreshBody();
+  }
+
+  damageCrate(obstacle, amount) {
+    if (!obstacle.breakable || !obstacle.active) return;
+    obstacle.crateHealth -= amount;
+    // Flash white on hit
+    obstacle.setTint(0xffffff);
+    this.time.delayedCall(80, () => { if (obstacle.active) obstacle.clearTint(); });
+    this.cameras.main.shake(40, 0.002);
+    if (obstacle.crateHealth <= 0) this.breakCrate(obstacle);
+  }
+
+  breakCrate(obstacle) {
+    const x = obstacle.x, y = obstacle.y;
+    // Splinter particles
+    for (let i = 0; i < 6; i++) {
+      const a = Math.random() * Math.PI * 2;
+      const dist = Phaser.Math.Between(14, 30);
+      const c = this.add.rectangle(x, y, 4, 4, 0x8b5a2b).setDepth(14);
+      this.tweens.add({
+        targets: c,
+        x: x + Math.cos(a) * dist, y: y + Math.sin(a) * dist,
+        alpha: 0, duration: 380, onComplete: () => c.destroy(),
+      });
+    }
+    Sound.mangoSplat();
+    obstacle.destroy();
+    this.spawnPickup(x, y, undefined, 'crate');
   }
 
   getActive() { return this.activeKey === 'mangobob' ? this.mangobob : this.jeff; }
@@ -508,17 +547,32 @@ export class GameScene extends Phaser.Scene {
     if (w.shakeAmount) this.cameras.main.shake(w.shakeDuration, w.shakeAmount);
   }
 
-  // F key: always throws a mango grenade (AOE splash, arcing)
+  // F key: throws a mango grenade (finite ammo, reset each level)
   tryHeavy(player, time) {
     if (player.charKey !== 'mangobob') return;
     if (player.heavyReady && time < player.heavyReady) return;
+    if (this.grenadeAmmo <= 0) {
+      // Click sound + brief "out of grenades" flash
+      Sound.menuClick();
+      if (!this._outOfGrenadesAt || time - this._outOfGrenadesAt > 800) {
+        this._outOfGrenadesAt = time;
+        const msg = this.add.text(player.x, player.y - 40, 'No grenades!', {
+          fontFamily: 'Trebuchet MS', fontSize: '14px', color: '#ffb347',
+          stroke: '#3a2510', strokeThickness: 3,
+        }).setOrigin(0.5).setDepth(100);
+        this.tweens.add({ targets: msg, y: player.y - 70, alpha: 0, duration: 700, onComplete: () => msg.destroy() });
+      }
+      return;
+    }
     player.heavyReady = time + 900;
+    this.grenadeAmmo--;
     const aim = player.getAimDirection();
     this.firePlayerProjectile(player, 'grenade', aim, {
       speed: 320, damage: 0, ttl: 900, splashRadius: 78, splashDamage: 4,
       scale: 1.2, spin: 10, explodeOnImpact: true,
     });
     Sound.throw();
+    this.events.emit('hud-refresh', this.getHudState());
   }
 
   meleeHit(player, aim, reach, damage) {
@@ -534,6 +588,12 @@ export class GameScene extends Phaser.Scene {
     this.bossGroup.getChildren().forEach((b) => {
       if (Phaser.Geom.Intersects.CircleToRectangle(hitbox, b.getBounds())) {
         b.takeDamage(damage, player);
+      }
+    });
+    // Smash breakable crates in range
+    this.obstacles.getChildren().forEach((o) => {
+      if (o.breakable && Phaser.Geom.Intersects.CircleToRectangle(hitbox, o.getBounds())) {
+        this.damageCrate(o, damage);
       }
     });
   }
@@ -848,10 +908,18 @@ export class GameScene extends Phaser.Scene {
     });
   }
 
-  spawnPickup(x, y, forceType) {
+  spawnPickup(x, y, forceType, source = 'monkey') {
     let type = forceType;
     if (!type) {
-      type = Phaser.Math.Between(0, 99) < 70 ? 'mango' : 'golden-mango';
+      const roll = Phaser.Math.Between(0, 99);
+      if (source === 'crate') {
+        // Crates mostly drop mangoes (health) — they're a reliable source
+        type = roll < 60 ? 'mango' : (roll < 90 ? 'golden-mango' : null);
+      } else {
+        // Monkeys mostly drop coins, rarely drop mangoes
+        type = roll < 75 ? 'golden-mango' : (roll < 90 ? 'mango' : null);
+      }
+      if (!type) return; // ~10% chance of nothing at all
     }
     const pk = this.pickups.create(x, y, type);
     pk.pickupType = type;
@@ -862,15 +930,15 @@ export class GameScene extends Phaser.Scene {
 
   pickUp(player, pk) {
     if (pk.pickupType === 'mango') {
-      const heal = player.cfg.mangoHealAmount || 2;
+      // Health ONLY — no wallet, no Fury
+      const heal = player.cfg.mangoHealAmount || 3;
       player.heal(heal);
-      this.gainFury(1);
       Sound.mangoPickup();
     } else if (pk.pickupType === 'golden-mango') {
+      // Coin — wallet + Fury charge, NO health
       this.mangoesCollected++;
       this.wallet++;
       this.save = SaveSystem.save({ ...this.save, wallet: this.wallet });
-      [this.mangobob, this.jeff].forEach((p) => p.heal(1));
       this.gainFury(2);
       Sound.goldenPickup();
     }
@@ -941,6 +1009,7 @@ export class GameScene extends Phaser.Scene {
         remaining: this.furyActive ? Math.max(0, this.furyUntil - this.time.now) : 0,
         duration: this.furyDuration,
       },
+      grenades: { count: this.grenadeAmmo, max: this.grenadeAmmoMax },
     };
   }
 }

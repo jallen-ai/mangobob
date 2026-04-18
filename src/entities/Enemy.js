@@ -138,7 +138,7 @@ export class Boss extends Phaser.Physics.Arcade.Sprite {
     this.isFinalEncounter = !!opts.isFinalEncounter;
 
     // Scale HP + speed with each encounter — he gets tougher every time he comes back
-    const hpByEncounter = [60, 85, 110, 150];
+    const hpByEncounter = [130, 180, 230, 310];
     this.maxHealth = hpByEncounter[Math.min(this.encounterCount, hpByEncounter.length - 1)];
     this.health = this.maxHealth;
     this.phase = 1;
