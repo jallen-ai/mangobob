@@ -34,11 +34,9 @@ export class TitleScene extends Phaser.Scene {
       strokeThickness: 4,
     }).setOrigin(0.5);
 
-    // Character showcase
-    this.add.image(GAME_WIDTH / 2 - 110, 330, 'mangobob').setDisplaySize(140, 140);
-    this.add.image(GAME_WIDTH / 2 + 110, 335, 'jeff').setScale(3);
-    this.add.text(GAME_WIDTH / 2 - 110, 395, 'MangoBob', { fontSize: '18px', color: '#ffb347' }).setOrigin(0.5);
-    this.add.text(GAME_WIDTH / 2 + 110, 395, 'Jeff', { fontSize: '18px', color: '#3a72c4' }).setOrigin(0.5);
+    // Character showcase \u2014 Jeff is out of the lineup for now, MangoBob centered
+    this.add.image(GAME_WIDTH / 2, 330, 'mangobob').setDisplaySize(160, 160);
+    this.add.text(GAME_WIDTH / 2, 410, 'MangoBob', { fontSize: '18px', color: '#ffb347' }).setOrigin(0.5);
 
     // Menu
     const hasSave = SaveSystem.hasSave();
