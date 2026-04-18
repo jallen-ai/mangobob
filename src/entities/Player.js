@@ -47,11 +47,25 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     scene.physics.add.existing(this);
 
     this.setCollideWorldBounds(true);
-    this.body.setSize(this.width * cfg.hitboxScale, this.height * cfg.hitboxScale);
-    this.body.setOffset(
-      (this.width - this.width * cfg.hitboxScale) / 2,
-      this.height - this.height * cfg.hitboxScale,
-    );
+
+    // Scale real-art sprites down to match game scale
+    if (charKey === 'mangobob' && this.width > 100) {
+      // Loaded texture (e.g. 256x252) — scale display to game size and set a torso-area hitbox
+      const targetWidth = 40;
+      const displayScale = targetWidth / this.width;
+      this.setScale(displayScale);
+      // Torso-ish body in texture coords; origin stays centered
+      const bodyW = this.width * 0.55;
+      const bodyH = this.height * 0.6;
+      this.body.setSize(bodyW, bodyH);
+      this.body.setOffset((this.width - bodyW) / 2, this.height - bodyH);
+    } else {
+      this.body.setSize(this.width * cfg.hitboxScale, this.height * cfg.hitboxScale);
+      this.body.setOffset(
+        (this.width - this.width * cfg.hitboxScale) / 2,
+        this.height - this.height * cfg.hitboxScale,
+      );
+    }
 
     this.health = cfg.maxHealth;
     this.maxHealth = cfg.maxHealth;

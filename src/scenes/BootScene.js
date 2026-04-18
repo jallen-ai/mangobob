@@ -4,8 +4,13 @@
 export class BootScene extends Phaser.Scene {
   constructor() { super('Boot'); }
 
+  preload() {
+    this.load.image('mangobob', 'assets/mangobob.png');
+  }
+
   create() {
-    this.makeMangoBob();
+    // Real art loaded for mangobob in preload; fall back to procedural only if missing
+    if (!this.textures.exists('mangobob')) this.makeMangoBob();
     this.makeJeff();
     this.makeMonkey();
     this.makeBoss();

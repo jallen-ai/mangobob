@@ -35,7 +35,7 @@ export class TitleScene extends Phaser.Scene {
     }).setOrigin(0.5);
 
     // Character showcase
-    this.add.image(GAME_WIDTH / 2 - 110, 330, 'mangobob').setScale(3);
+    this.add.image(GAME_WIDTH / 2 - 110, 330, 'mangobob').setDisplaySize(140, 140);
     this.add.image(GAME_WIDTH / 2 + 110, 335, 'jeff').setScale(3);
     this.add.text(GAME_WIDTH / 2 - 110, 395, 'MangoBob', { fontSize: '18px', color: '#ffb347' }).setOrigin(0.5);
     this.add.text(GAME_WIDTH / 2 + 110, 395, 'Jeff', { fontSize: '18px', color: '#3a72c4' }).setOrigin(0.5);

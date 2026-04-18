@@ -18,8 +18,8 @@ export class GameOverScene extends Phaser.Scene {
       fontFamily: 'Trebuchet MS', fontSize: '22px', color: '#f5e6c8',
     }).setOrigin(0.5);
 
-    this.add.image(GAME_WIDTH / 2 - 40, 360, 'mangobob').setScale(3).setTint(0x888888);
-    this.add.image(GAME_WIDTH / 2 + 40, 365, 'jeff').setScale(3).setTint(0x888888);
+    this.add.image(GAME_WIDTH / 2 - 70, 360, 'mangobob').setDisplaySize(120, 120).setTint(0x888888);
+    this.add.image(GAME_WIDTH / 2 + 70, 365, 'jeff').setScale(3).setTint(0x888888);
 
     this.add.text(GAME_WIDTH / 2, 440, `Golden Mangoes: ${data?.mangoes || 0}`, {
       fontFamily: 'Trebuchet MS', fontSize: '20px', color: '#ffe24a',

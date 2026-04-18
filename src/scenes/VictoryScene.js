@@ -18,8 +18,8 @@ export class VictoryScene extends Phaser.Scene {
       fontFamily: 'Trebuchet MS', fontSize: '24px', color: '#f5e6c8',
     }).setOrigin(0.5);
 
-    this.add.image(GAME_WIDTH / 2 - 70, 360, 'mangobob').setScale(3.5);
-    this.add.image(GAME_WIDTH / 2 + 70, 365, 'jeff').setScale(3.5);
+    this.add.image(GAME_WIDTH / 2 - 80, 360, 'mangobob').setDisplaySize(140, 140);
+    this.add.image(GAME_WIDTH / 2 + 80, 365, 'jeff').setScale(3.5);
 
     this.add.text(GAME_WIDTH / 2, 450, `Golden Mangoes Collected: ${data?.mangoes || 0}`, {
       fontFamily: 'Trebuchet MS', fontSize: '22px', color: '#ffe24a',

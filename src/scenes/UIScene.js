@@ -7,7 +7,7 @@ export class UIScene extends Phaser.Scene {
     this.bg = this.add.rectangle(0, 0, GAME_WIDTH, 72, 0x0f1a10, 0.72).setOrigin(0, 0);
 
     // MangoBob portrait + bar + hearts
-    this.mbPortrait = this.add.image(30, 34, 'mangobob').setScale(0.9);
+    this.mbPortrait = this.add.image(30, 34, 'mangobob').setDisplaySize(34, 34);
     this.mbBarBg = this.add.rectangle(56, 20, 140, 10, 0x3a2510).setOrigin(0, 0.5);
     this.mbBar = this.add.rectangle(57, 20, 138, 8, 0xff6a1a).setOrigin(0, 0.5);
     this.mbLabel = this.add.text(56, 30, 'MangoBob', { fontFamily: 'Trebuchet MS', fontSize: '11px', color: '#ffb347' }).setOrigin(0, 0);
