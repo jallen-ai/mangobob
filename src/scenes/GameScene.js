@@ -18,14 +18,16 @@ export class GameScene extends Phaser.Scene {
     this.mangobobLives = this.save.mangobobLives;
     this.jeffLives = this.save.jeffLives;
     this.mangoesCollected = this.save.mangoesCollected;
+    this.wallet = this.save.wallet || 0;
     this.currentLevelId = data?.level || this.save.levelId || 1;
     this.currentLevel = LEVELS[this.currentLevelId] || LEVEL1;
     this.currentZoneIdx = data?.zoneIdx !== undefined ? data.zoneIdx : Math.max(0, (this.save.zone || 1) - 1);
     this.paused = false;
 
-    // Mango Fury super-move
+    // Mango Fury super-move — max and duration can be tuned by upgrades
     this.furyCharge = 0;
     this.furyMax = 5;
+    this.furyDuration = 6000;
     this.furyActive = false;
     this.furyUntil = 0;
 
@@ -67,7 +69,8 @@ export class GameScene extends Phaser.Scene {
     const spawnY = level.playerSpawn.y;
 
     // Players — Jeff is temporarily out of the game. Keep a hidden stub so references work.
-    this.mangobob = new Player(this, spawnX, spawnY, 'mangobob');
+    const owned = this.save.upgrades || [];
+    this.mangobob = new Player(this, spawnX, spawnY, 'mangobob', owned);
     this.jeff = new Player(this, spawnX + 9999, spawnY, 'jeff');
     this.jeff.setVisible(false);
     this.jeff.body.enable = false;
@@ -79,6 +82,14 @@ export class GameScene extends Phaser.Scene {
     this.companion = null;
 
     this.mangobob.on('died', () => this.handleActiveDeath('mangobob'));
+
+    // Apply any global-level upgrade effects (Fury + bonus lives)
+    if (this.mangobob.cfg.furyMax) this.furyMax = this.mangobob.cfg.furyMax;
+    if (this.mangobob.cfg.furyDuration) this.furyDuration = this.mangobob.cfg.furyDuration;
+    if (this.mangobob.cfg.bonusLives && !this.save.bonusLivesApplied) {
+      this.mangobobLives += this.mangobob.cfg.bonusLives;
+      this.save = SaveSystem.save({ ...this.save, mangobobLives: this.mangobobLives, bonusLivesApplied: true });
+    }
 
     // Groups
     this.enemies = this.physics.add.group({ runChildUpdate: false });
@@ -118,7 +129,7 @@ export class GameScene extends Phaser.Scene {
     this.keys = this.input.keyboard.addKeys({
       W: 'W', A: 'A', S: 'S', D: 'D',
       UP: 'UP', DOWN: 'DOWN', LEFT: 'LEFT', RIGHT: 'RIGHT',
-      SPACE: 'SPACE', E: 'E', F: 'F', R: 'R', SHIFT: 'SHIFT', Q: 'Q', P: 'P', M: 'M', ESC: 'ESC',
+      SPACE: 'SPACE', E: 'E', F: 'F', R: 'R', V: 'V', SHIFT: 'SHIFT', Q: 'Q', P: 'P', M: 'M', ESC: 'ESC',
     });
     // Q swap disabled while Jeff is out of the lineup
     this.input.keyboard.on('keydown-P', () => this.togglePause());
@@ -315,6 +326,7 @@ export class GameScene extends Phaser.Scene {
       left: this.keys.A.isDown || this.keys.LEFT.isDown,
       right: this.keys.D.isDown || this.keys.RIGHT.isDown,
       dodgePressed: Phaser.Input.Keyboard.JustDown(this.keys.SHIFT),
+      jumpPressed: Phaser.Input.Keyboard.JustDown(this.keys.V),
     };
 
     active.update(time, delta, input);
@@ -396,7 +408,7 @@ export class GameScene extends Phaser.Scene {
     if (!this.mangobob.isAlive) return;
 
     this.furyActive = true;
-    this.furyUntil = this.time.now + 6000;
+    this.furyUntil = this.time.now + this.furyDuration;
     this.furyCharge = 0;
 
     Sound.furyActivate();
@@ -570,6 +582,7 @@ export class GameScene extends Phaser.Scene {
 
   contactDamage(player, enemy) {
     if (!player.isAlive || !enemy.active) return;
+    if (player.airborne) return; // jumping over ground threats
     if (player.takeDamage(1, enemy, this.time.now)) {
       this.events.emit('hud-refresh', this.getHudState());
     }
@@ -733,10 +746,9 @@ export class GameScene extends Phaser.Scene {
     Sound.zoneCleared();
     this.cameras.main.fadeOut(500, 0, 0, 0);
     this.cameras.main.once('camerafadeoutcomplete', () => {
-      this.save = SaveSystem.save({ ...this.save, levelId: 2, zone: 1 });
+      // Go through the shop before starting Level 2
       this.scene.stop('UI');
-      this.scene.start('Game', { level: 2, zoneIdx: 0 });
-      this.scene.launch('UI');
+      this.scene.start('Shop', { nextLevel: 2, nextZoneIdx: 0 });
     });
   }
 
@@ -754,11 +766,14 @@ export class GameScene extends Phaser.Scene {
 
   pickUp(player, pk) {
     if (pk.pickupType === 'mango') {
-      player.heal(2);
+      const heal = player.cfg.mangoHealAmount || 2;
+      player.heal(heal);
       this.gainFury(1);
       Sound.mangoPickup();
     } else if (pk.pickupType === 'golden-mango') {
       this.mangoesCollected++;
+      this.wallet++;
+      this.save = SaveSystem.save({ ...this.save, wallet: this.wallet });
       [this.mangobob, this.jeff].forEach((p) => p.heal(1));
       this.gainFury(2);
       Sound.goldenPickup();
@@ -821,12 +836,14 @@ export class GameScene extends Phaser.Scene {
       jeff: { hp: this.jeff.health, max: this.jeff.maxHealth, alive: this.jeff.isAlive, lives: this.jeffLives },
       mangoes: this.mangoesCollected,
       zoneName: `${this.currentLevel.name || ''} \u2022 ${this.currentLevel.zones[this.currentZoneIdx]?.name || ''}`,
+      wallet: this.wallet,
       boss: boss && boss.active ? { hp: boss.health, max: boss.maxHealth } : null,
       fury: {
         charge: this.furyCharge,
         max: this.furyMax,
         active: this.furyActive,
         remaining: this.furyActive ? Math.max(0, this.furyUntil - this.time.now) : 0,
+        duration: this.furyDuration,
       },
     };
   }

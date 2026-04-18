@@ -1,4 +1,5 @@
 import { Sound } from '../systems/Sound.js';
+import { buildEffectiveStats } from '../systems/Upgrades.js';
 
 export const CHAR_CONFIG = {
   mangobob: {
@@ -37,8 +38,12 @@ export const CHAR_CONFIG = {
 };
 
 export class Player extends Phaser.Physics.Arcade.Sprite {
-  constructor(scene, x, y, charKey) {
-    const cfg = CHAR_CONFIG[charKey];
+  constructor(scene, x, y, charKey, ownedUpgrades = []) {
+    const baseCfg = CHAR_CONFIG[charKey];
+    // Fold owned upgrades over base stats (only for mangobob right now)
+    const cfg = charKey === 'mangobob'
+      ? buildEffectiveStats(baseCfg, ownedUpgrades)
+      : baseCfg;
     super(scene, x, y, cfg.key);
     this.charKey = charKey;
     this.cfg = cfg;
@@ -81,6 +86,15 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     this.heavyReady = 0;
     this.knockback = new Phaser.Math.Vector2(0, 0);
     this.setDepth(10);
+
+    // Jump state: vertical visual offset + shadow on ground
+    this.airborne = false;
+    this.jumpUntil = 0;
+    this.jumpCooldownUntil = 0;
+    this.jumpVisualOffset = 0;
+    this.baseY = 0; // updated each frame to current physics y
+
+    this.shadow = scene.add.ellipse(x, y + this.displayHeight * 0.5, 28, 8, 0x000000, 0.35).setDepth(9);
 
     if (charKey === 'mangobob') {
       this.club = scene.add.image(x, y, 'mango-club')
@@ -157,6 +171,44 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     return this;
   }
 
+  tryJump(now) {
+    if (this.airborne) return false;
+    if (now < this.jumpCooldownUntil) return false;
+    this.airborne = true;
+    this.jumpCooldownUntil = now + 700;
+    this.jumpShadowY = this.y;
+    this.jumpShadowX = this.x;
+
+    const scene = this.scene;
+    const mult = this.cfg.jumpHeightMult || 1;
+    scene.tweens.add({
+      targets: this,
+      y: this.y - 26 * mult,
+      yoyo: true,
+      duration: 210,
+      ease: 'Quad.easeOut',
+      onComplete: () => { this.airborne = false; },
+    });
+    return true;
+  }
+
+  updateShadow() {
+    if (!this.shadow || !this.isAlive) {
+      if (this.shadow) this.shadow.setVisible(this.isAlive);
+      return;
+    }
+    this.shadow.setVisible(true);
+    if (this.airborne) {
+      // Shadow tracks horizontal movement but stays on the ground
+      this.shadow.setPosition(this.x, this.jumpShadowY + this.displayHeight * 0.4);
+      // Shrink slightly while airborne for a sense of height
+      this.shadow.setScale(0.7, 0.7).setAlpha(0.22);
+    } else {
+      this.shadow.setPosition(this.x, this.y + this.displayHeight * 0.4);
+      this.shadow.setScale(1, 1).setAlpha(0.35);
+    }
+  }
+
   update(time, delta, input) {
     if (!this.isAlive) return;
 
@@ -195,12 +247,17 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     else if (vx > 0.1) this.setFlipX(false);
 
     this.updateClubPose();
+    this.updateShadow();
+
+    // Jump
+    if (input.jumpPressed) this.tryJump(now);
 
     // Dodge
     if (input.dodgePressed && now > this.dodgeCooldownUntil) {
-      this.dodgeUntil = now + 220;
+      const dodgeMult = this.cfg.dodgeDistanceMult || 1;
+      this.dodgeUntil = now + 220 * dodgeMult;
       this.dodgeCooldownUntil = now + 900;
-      this.iFramesUntil = Math.max(this.iFramesUntil, now + 240);
+      this.iFramesUntil = Math.max(this.iFramesUntil, now + 240 * dodgeMult);
       Sound.dodge();
       this.scene.tweens.add({
         targets: this,

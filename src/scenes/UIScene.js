@@ -20,9 +20,12 @@ export class UIScene extends Phaser.Scene {
     this.jfLabel = this.add.text(286, 30, 'Jeff', { fontFamily: 'Trebuchet MS', fontSize: '11px', color: '#3a72c4' }).setOrigin(0, 0).setVisible(false);
     this.jfHearts = [];
 
-    // Mangoes (shifted right to make room)
-    this.mangoIcon = this.add.image(480, 34, 'golden-mango').setScale(1.1);
-    this.mangoText = this.add.text(498, 34, 'x 0', { fontFamily: 'Trebuchet MS', fontSize: '18px', color: '#ffe24a', stroke: '#3a2510', strokeThickness: 3 }).setOrigin(0, 0.5);
+    // Per-run mangoes (shifted right to make room)
+    this.mangoIcon = this.add.image(470, 34, 'golden-mango').setScale(1.1);
+    this.mangoText = this.add.text(486, 34, 'x 0', { fontFamily: 'Trebuchet MS', fontSize: '16px', color: '#ffe24a', stroke: '#3a2510', strokeThickness: 3 }).setOrigin(0, 0.5);
+    // Wallet (persistent, spendable in shop)
+    this.walletLabel = this.add.text(470, 16, 'WALLET', { fontFamily: 'Trebuchet MS', fontSize: '9px', color: '#b89030' }).setOrigin(0, 0);
+    this.walletText = this.add.text(526, 16, '0', { fontFamily: 'Trebuchet MS', fontSize: '10px', color: '#ffe24a' }).setOrigin(0, 0);
 
     // Fury meter
     this.furyLabel = this.add.text(600, 16, 'FURY', { fontFamily: 'Trebuchet MS', fontSize: '11px', color: '#ffb347' }).setOrigin(0, 0);
@@ -108,6 +111,7 @@ export class UIScene extends Phaser.Scene {
     this.jfBar.width = 138 * jfRatio;
 
     this.mangoText.setText('x ' + state.mangoes);
+    if (this.walletText) this.walletText.setText(String(state.wallet ?? 0));
     this.zoneText.setText(state.zoneName);
 
     // Active ring

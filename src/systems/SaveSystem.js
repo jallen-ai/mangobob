@@ -5,7 +5,14 @@ const defaultSave = () => ({
   jeffLives: 3,
   levelId: 1,
   zone: 1,
+  // Per-run counter (resets on death/new game)
   mangoesCollected: 0,
+  // Persistent wallet — survives death, spent in shop
+  wallet: 0,
+  // Array of purchased upgrade ids (see Upgrades.js)
+  upgrades: [],
+  // How many times the player has faced the Rotten Mango King (0..3)
+  bossEncounters: 0,
   bossDefeated: false,
   lastPlayed: null,
 });

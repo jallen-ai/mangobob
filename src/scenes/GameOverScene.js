@@ -25,8 +25,14 @@ export class GameOverScene extends Phaser.Scene {
       fontFamily: 'Trebuchet MS', fontSize: '20px', color: '#ffe24a',
     }).setOrigin(0.5);
 
-    // Reset save so Continue doesn't bring them back with 0 lives
+    // Reset per-run state but KEEP persistent progression (wallet, upgrades, bossEncounters).
+    const prev = SaveSystem.load();
     SaveSystem.reset();
+    SaveSystem.save({
+      wallet: prev.wallet || 0,
+      upgrades: prev.upgrades || [],
+      bossEncounters: prev.bossEncounters || 0,
+    });
 
     const btn = this.add.text(GAME_WIDTH / 2, 520, 'TRY AGAIN', {
       fontFamily: 'Trebuchet MS', fontSize: '28px', color: '#f5e6c8',
