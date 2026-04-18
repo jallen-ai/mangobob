@@ -5,9 +5,10 @@ export const CHAR_CONFIG = {
     maxHealth: 10,
     speed: 150,
     hitboxScale: 0.85,
-    primaryName: 'Punch',
-    primaryCooldown: 280,
-    primaryDamage: 2,
+    primaryName: 'Mango Club',
+    primaryCooldown: 380,
+    primaryDamage: 3,
+    primaryReach: 42,
     secondaryName: 'Mango Throw',
     secondaryCooldown: 420,
     secondaryDamage: 2,
@@ -64,6 +65,14 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     this.heavyReady = 0;
     this.knockback = new Phaser.Math.Vector2(0, 0);
     this.setDepth(10);
+
+    if (charKey === 'mangobob') {
+      this.club = scene.add.image(x, y, 'mango-club')
+        .setOrigin(0.5, 0.9)
+        .setDepth(11);
+      this.clubSwinging = false;
+      this.furyAura = scene.add.image(x, y, 'fury-glow').setDepth(9).setVisible(false);
+    }
   }
 
   setActiveCharacter(active) {
@@ -119,6 +128,14 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     this.setAlpha(1);
     this.setVisible(true);
     if (this.body) this.body.enable = true;
+    if (this.club) this.club.setVisible(true);
+  }
+
+  setVisible(v) {
+    super.setVisible(v);
+    if (this.club) this.club.setVisible(v && this.isAlive);
+    if (this.furyAura && !v) this.furyAura.setVisible(false);
+    return this;
   }
 
   update(time, delta, input) {
@@ -158,6 +175,8 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     if (vx < -0.1) this.setFlipX(true);
     else if (vx > 0.1) this.setFlipX(false);
 
+    this.updateClubPose();
+
     // Dodge
     if (input.dodgePressed && now > this.dodgeCooldownUntil) {
       this.dodgeUntil = now + 220;
@@ -174,8 +193,40 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
 
   tryPrimary(now) {
     if (now < this.primaryReady) return false;
-    this.primaryReady = now + this.cfg.primaryCooldown;
+    const furyActive = this.scene.furyActive && this.charKey === 'mangobob';
+    const cd = furyActive ? this.cfg.primaryCooldown * 0.5 : this.cfg.primaryCooldown;
+    this.primaryReady = now + cd;
     return true;
+  }
+
+  swingClub(aim, empowered) {
+    if (!this.club) return;
+    const baseAngle = Math.atan2(aim.y, aim.x);
+    const cx = this.x + aim.x * 12;
+    const cy = this.y + aim.y * 12 + 4;
+    this.club.setPosition(cx, cy);
+    this.club.setScale(empowered ? 1.35 : 1);
+    this.club.rotation = baseAngle + Math.PI / 6; // start: 30deg behind aim
+    this.clubSwinging = true;
+
+    this.scene.tweens.add({
+      targets: this.club,
+      rotation: baseAngle + (5 * Math.PI) / 6, // end: 150deg past start
+      duration: empowered ? 130 : 180,
+      ease: 'Cubic.easeOut',
+      onComplete: () => { this.clubSwinging = false; },
+    });
+  }
+
+  updateClubPose() {
+    if (!this.club) return;
+    if (!this.isAlive) { this.club.setVisible(false); return; }
+    if (this.clubSwinging) return;
+    // Idle carry pose: held at the side, tilted outward
+    const side = this.flipX ? -1 : 1;
+    this.club.setPosition(this.x + side * 9, this.y + 6);
+    this.club.rotation = side * 0.45; // ~26deg outward lean
+    this.club.setScale(1);
   }
 
   trySecondary(now) {

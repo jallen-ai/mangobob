@@ -22,6 +22,8 @@ export class BootScene extends Phaser.Scene {
     this.makePath();
     this.makeGate();
     this.makeHeart();
+    this.makeMangoClub();
+    this.makeFuryGlow();
     this.makePixel();
 
     this.scene.start('Title');
@@ -203,6 +205,37 @@ export class BootScene extends Phaser.Scene {
       g.fillStyle(0x5a3a22, 1).fillRect(4, 4, 88, 56);
       g.fillStyle(0x2f1e10, 1).fillRect(46, 8, 4, 56);
       g.fillStyle(0xd4a017, 1).fillCircle(36, 34, 3).fillCircle(60, 34, 3);
+    });
+  }
+
+  makeMangoClub() {
+    // Drawn vertically: handle at bottom, mango head at top.
+    // Origin will be set near the grip so it pivots naturally on rotation.
+    this.bake('mango-club', 16, 44, (g) => {
+      // Handle
+      g.fillStyle(0x6b3a1b, 1).fillRect(6, 16, 4, 28);
+      // Grip wrap (darker bottom third with horizontal bands)
+      g.fillStyle(0x3a1a0b, 1).fillRect(6, 32, 4, 12);
+      g.fillStyle(0x8b5a2b, 1).fillRect(6, 34, 4, 1).fillRect(6, 38, 4, 1).fillRect(6, 42, 4, 1);
+      // Bindings where head meets handle
+      g.fillStyle(0xd4a017, 1).fillRect(5, 15, 6, 2);
+      // Head (big mango cluster)
+      g.fillStyle(0xff9b2a, 1).fillCircle(8, 10, 8);
+      // Side bumps
+      g.fillStyle(0xe07020, 1).fillCircle(1, 10, 3).fillCircle(15, 10, 3);
+      g.fillCircle(8, 2, 2);
+      // Highlight
+      g.fillStyle(0xffc46b, 1).fillCircle(6, 6, 3);
+      // Leaf
+      g.fillStyle(0x2d6b1e, 1).fillRect(7, 3, 2, 3);
+    });
+  }
+
+  makeFuryGlow() {
+    this.bake('fury-glow', 48, 48, (g) => {
+      g.fillStyle(0xffe24a, 0.35).fillCircle(24, 24, 22);
+      g.fillStyle(0xffb347, 0.5).fillCircle(24, 24, 14);
+      g.fillStyle(0xffffff, 0.4).fillCircle(24, 24, 6);
     });
   }
 

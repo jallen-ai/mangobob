@@ -25,4 +25,6 @@ const config = {
   scene: [BootScene, TitleScene, GameScene, UIScene, GameOverScene, VictoryScene],
 };
 
-new Phaser.Game(config);
+const game = new Phaser.Game(config);
+// Debug handle for dev-tools inspection
+if (typeof window !== 'undefined') window.__mangoGame = game;

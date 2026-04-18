@@ -16,6 +16,12 @@ export class GameScene extends Phaser.Scene {
     this.currentZoneIdx = Math.max(0, this.save.zone - 1);
     this.paused = false;
 
+    // Mango Fury super-move
+    this.furyCharge = 0;
+    this.furyMax = 5;
+    this.furyActive = false;
+    this.furyUntil = 0;
+
     // World bounds = the full level width
     const level = LEVEL1;
     this.physics.world.setBounds(0, 0, level.width, level.height);
@@ -102,10 +108,11 @@ export class GameScene extends Phaser.Scene {
     this.keys = this.input.keyboard.addKeys({
       W: 'W', A: 'A', S: 'S', D: 'D',
       UP: 'UP', DOWN: 'DOWN', LEFT: 'LEFT', RIGHT: 'RIGHT',
-      SPACE: 'SPACE', E: 'E', F: 'F', SHIFT: 'SHIFT', Q: 'Q', P: 'P', M: 'M', ESC: 'ESC',
+      SPACE: 'SPACE', E: 'E', F: 'F', R: 'R', SHIFT: 'SHIFT', Q: 'Q', P: 'P', M: 'M', ESC: 'ESC',
     });
     this.input.keyboard.on('keydown-Q', () => this.swapCharacters());
     this.input.keyboard.on('keydown-P', () => this.togglePause());
+    this.input.keyboard.on('keydown-R', () => this.tryActivateFury());
     this.input.keyboard.on('keydown-ESC', () => this.scene.start('Title'));
 
     // Wave state per zone
@@ -301,6 +308,12 @@ export class GameScene extends Phaser.Scene {
     this.enemies.getChildren().forEach((e) => e.update(time, delta, active));
     this.bossGroup.getChildren().forEach((b) => b.update(time, delta, active));
 
+    // Fury timer + aura follow
+    if (this.mangobob.furyAura && this.mangobob.furyAura.visible) {
+      this.mangobob.furyAura.setPosition(this.mangobob.x, this.mangobob.y);
+    }
+    if (this.furyActive && time > this.furyUntil) this.deactivateFury();
+
     // Zone transition: detect based on active char x
     const curZone = LEVEL1.zones[this.currentZoneIdx];
     if (curZone) {
@@ -324,16 +337,97 @@ export class GameScene extends Phaser.Scene {
     if (!player.tryPrimary(time)) return;
     const aim = player.getAimDirection();
     if (player.charKey === 'mangobob') {
-      // Punch: short-range melee hitbox
-      this.meleeHit(player, aim, 34, player.cfg.primaryDamage);
-      const fx = this.add.image(player.x + aim.x * 28, player.y + aim.y * 28, 'punch')
-        .setDepth(12).setScale(0.6).setAlpha(0.9);
-      this.tweens.add({ targets: fx, scale: 1.4, alpha: 0, duration: 180, onComplete: () => fx.destroy() });
+      // Mango Club swing
+      const empowered = this.furyActive;
+      const damage = empowered ? player.cfg.primaryDamage * 2 : player.cfg.primaryDamage;
+      const reach = empowered ? player.cfg.primaryReach * 1.5 : player.cfg.primaryReach;
+      this.meleeHit(player, aim, reach, damage);
+      player.swingClub(aim, empowered);
+      this.cameras.main.shake(empowered ? 80 : 40, empowered ? 0.004 : 0.002);
+
+      if (empowered) {
+        // Radial mini-mango shockwave on every Fury hit
+        const baseAngle = Math.atan2(aim.y, aim.x);
+        for (let i = 0; i < 5; i++) {
+          const a = baseAngle + (i - 2) * 0.35;
+          const dir = { x: Math.cos(a), y: Math.sin(a) };
+          this.firePlayerProjectile(player, 'mango', dir, {
+            speed: 420, damage: 2, ttl: 450, scale: 0.85, spin: 14,
+          });
+        }
+      }
     } else {
       // Slingshot: fast small projectile
       this.firePlayerProjectile(player, 'mango', aim, {
         speed: 520, damage: player.cfg.primaryDamage, ttl: 800, scale: 0.9, spin: 12,
       });
+    }
+  }
+
+  tryActivateFury() {
+    if (this.paused) return;
+    if (this.furyActive) return;
+    if (this.furyCharge < this.furyMax) return;
+    if (!this.mangobob.isAlive) return;
+
+    this.furyActive = true;
+    this.furyUntil = this.time.now + 6000;
+    this.furyCharge = 0;
+
+    const mb = this.mangobob;
+    mb.setTint(0xffe24a);
+    if (mb.furyAura) {
+      mb.furyAura.setVisible(true).setAlpha(0.9).setScale(1);
+      this.furyPulse = this.tweens.add({
+        targets: mb.furyAura,
+        scale: { from: 1, to: 1.4 },
+        alpha: { from: 0.9, to: 0.5 },
+        duration: 420,
+        yoyo: true,
+        repeat: -1,
+      });
+    }
+
+    this.cameras.main.flash(260, 255, 220, 100);
+    this.cameras.main.shake(260, 0.008);
+
+    const banner = this.add.text(GAME_WIDTH / 2, 140, 'MANGO FURY!', {
+      fontFamily: 'Trebuchet MS', fontSize: '56px', fontStyle: 'bold',
+      color: '#ffe24a', stroke: '#3a2510', strokeThickness: 8,
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(200).setScale(0.5);
+    this.tweens.add({
+      targets: banner,
+      scale: { from: 0.5, to: 1.4 },
+      alpha: { from: 1, to: 0 },
+      duration: 900,
+      ease: 'Cubic.easeOut',
+      onComplete: () => banner.destroy(),
+    });
+
+    this.events.emit('fury-activated');
+    this.events.emit('hud-refresh', this.getHudState());
+  }
+
+  deactivateFury() {
+    this.furyActive = false;
+    this.mangobob.clearTint();
+    if (this.mangobob.furyAura) this.mangobob.furyAura.setVisible(false);
+    if (this.furyPulse) { this.furyPulse.stop(); this.furyPulse = null; }
+    this.events.emit('fury-ended');
+    this.events.emit('hud-refresh', this.getHudState());
+  }
+
+  gainFury(amount) {
+    if (this.furyActive) return;
+    const before = this.furyCharge;
+    this.furyCharge = Math.min(this.furyMax, this.furyCharge + amount);
+    if (before < this.furyMax && this.furyCharge === this.furyMax) {
+      this.cameras.main.flash(180, 255, 220, 80);
+      const hint = this.add.text(GAME_WIDTH / 2, 110, 'FURY READY — press R', {
+        fontFamily: 'Trebuchet MS', fontSize: '22px', color: '#ffe24a',
+        stroke: '#3a2510', strokeThickness: 4,
+      }).setOrigin(0.5).setScrollFactor(0).setDepth(200);
+      this.tweens.add({ targets: hint, alpha: 0, y: 90, duration: 1600, delay: 400, onComplete: () => hint.destroy() });
     }
   }
 
@@ -571,9 +665,11 @@ export class GameScene extends Phaser.Scene {
   pickUp(player, pk) {
     if (pk.pickupType === 'mango') {
       player.heal(2);
+      this.gainFury(1);
     } else if (pk.pickupType === 'golden-mango') {
       this.mangoesCollected++;
       [this.mangobob, this.jeff].forEach((p) => p.heal(1));
+      this.gainFury(2);
     }
     const fx = this.add.image(pk.x, pk.y, 'splash').setScale(0.3).setAlpha(0.7).setDepth(14);
     this.tweens.add({ targets: fx, scale: 0.9, alpha: 0, duration: 260, onComplete: () => fx.destroy() });
@@ -648,6 +744,12 @@ export class GameScene extends Phaser.Scene {
       mangoes: this.mangoesCollected,
       zoneName: LEVEL1.zones[this.currentZoneIdx]?.name || '',
       boss: boss && boss.active ? { hp: boss.health, max: boss.maxHealth } : null,
+      fury: {
+        charge: this.furyCharge,
+        max: this.furyMax,
+        active: this.furyActive,
+        remaining: this.furyActive ? Math.max(0, this.furyUntil - this.time.now) : 0,
+      },
     };
   }
 }
