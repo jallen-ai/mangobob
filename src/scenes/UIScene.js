@@ -13,11 +13,11 @@ export class UIScene extends Phaser.Scene {
     this.mbLabel = this.add.text(56, 30, 'MangoBob', { fontFamily: 'Trebuchet MS', fontSize: '11px', color: '#ffb347' }).setOrigin(0, 0);
     this.mbHearts = [];
 
-    // Jeff portrait + bar + hearts
-    this.jfPortrait = this.add.image(260, 34, 'jeff').setScale(0.9);
-    this.jfBarBg = this.add.rectangle(286, 20, 140, 10, 0x3a2510).setOrigin(0, 0.5);
-    this.jfBar = this.add.rectangle(287, 20, 138, 8, 0x3a72c4).setOrigin(0, 0.5);
-    this.jfLabel = this.add.text(286, 30, 'Jeff', { fontFamily: 'Trebuchet MS', fontSize: '11px', color: '#3a72c4' }).setOrigin(0, 0);
+    // Jeff section hidden while he's out of the lineup
+    this.jfPortrait = this.add.image(260, 34, 'jeff').setVisible(false);
+    this.jfBarBg = this.add.rectangle(286, 20, 140, 10, 0x3a2510).setOrigin(0, 0.5).setVisible(false);
+    this.jfBar = this.add.rectangle(287, 20, 138, 8, 0x3a72c4).setOrigin(0, 0.5).setVisible(false);
+    this.jfLabel = this.add.text(286, 30, 'Jeff', { fontFamily: 'Trebuchet MS', fontSize: '11px', color: '#3a72c4' }).setOrigin(0, 0).setVisible(false);
     this.jfHearts = [];
 
     // Mangoes (shifted right to make room)
@@ -122,12 +122,8 @@ export class UIScene extends Phaser.Scene {
     for (let i = 0; i < state.mangobob.lives; i++) {
       this.mbHearts.push(this.add.image(60 + i * 14, 54, 'heart').setScale(0.55));
     }
-    for (let i = 0; i < state.jeff.lives; i++) {
-      this.jfHearts.push(this.add.image(290 + i * 14, 54, 'heart').setScale(0.55));
-    }
-    // When a character is out of lives, dim their whole section
+    // Jeff is hidden for now; no hearts rendered
     this.mbPortrait.setAlpha(state.mangobob.lives > 0 ? (state.mangobob.alive ? 1 : 0.45) : 0.25);
-    this.jfPortrait.setAlpha(state.jeff.lives > 0 ? (state.jeff.alive ? 1 : 0.45) : 0.25);
 
     // Fury meter
     const f = state.fury;

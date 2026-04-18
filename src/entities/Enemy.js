@@ -1,17 +1,27 @@
 import { Sound } from '../systems/Sound.js';
 
 export class Monkey extends Phaser.Physics.Arcade.Sprite {
-  constructor(scene, x, y) {
+  constructor(scene, x, y, variant = 'normal') {
     super(scene, x, y, 'monkey');
     scene.add.existing(this);
     scene.physics.add.existing(this);
     this.setCollideWorldBounds(true);
-    this.body.setSize(this.width * 0.8, this.height * 0.8);
     this.setDepth(9);
+    this.variant = variant;
 
-    this.maxHealth = 6;
+    // Variant tuning: small (1 hit), normal (2-3 hits), big (5+ hits)
+    let scale = 1, hp = 6, spd = 90, tint = 0xffffff;
+    if (variant === 'small') { scale = 0.7; hp = 2; spd = 135; tint = 0xffd680; }
+    else if (variant === 'big') { scale = 1.45; hp = 14; spd = 65; tint = 0x8b3a1a; }
+
+    this.setScale(scale);
+    if (tint !== 0xffffff) this.setTint(tint);
+    this.body.setSize(this.width * 0.8, this.height * 0.8);
+    this.baseTint = tint;
+
+    this.maxHealth = hp;
     this.health = this.maxHealth;
-    this.speed = 90;
+    this.speed = spd;
     this.state = 'patrol';
     this.stateSince = scene.time.now;
     this.nextThrowAt = scene.time.now + Phaser.Math.Between(1200, 2400);
@@ -29,7 +39,10 @@ export class Monkey extends Phaser.Physics.Arcade.Sprite {
     this.knockback.set((dx / len) * 200, (dy / len) * 200);
 
     this.setTint(0xff7777);
-    this.scene.time.delayedCall(90, () => this.clearTint());
+    this.scene.time.delayedCall(90, () => {
+      this.clearTint();
+      if (this.baseTint && this.baseTint !== 0xffffff) this.setTint(this.baseTint);
+    });
 
     if (this.health <= 0) {
       this.die();

@@ -6,16 +6,21 @@ import { Monkey, Boss } from '../entities/Enemy.js';
 import { SaveSystem } from '../systems/SaveSystem.js';
 import { Sound } from '../systems/Sound.js';
 import { LEVEL1 } from '../levels/Level1.js';
+import { LEVEL2 } from '../levels/Level2.js';
+
+const LEVELS = { 1: LEVEL1, 2: LEVEL2 };
 
 export class GameScene extends Phaser.Scene {
   constructor() { super('Game'); }
 
-  create() {
+  create(data) {
     this.save = SaveSystem.load();
     this.mangobobLives = this.save.mangobobLives;
     this.jeffLives = this.save.jeffLives;
     this.mangoesCollected = this.save.mangoesCollected;
-    this.currentZoneIdx = Math.max(0, this.save.zone - 1);
+    this.currentLevelId = data?.level || this.save.levelId || 1;
+    this.currentLevel = LEVELS[this.currentLevelId] || LEVEL1;
+    this.currentZoneIdx = data?.zoneIdx !== undefined ? data.zoneIdx : Math.max(0, (this.save.zone || 1) - 1);
     this.paused = false;
 
     // Mango Fury super-move
@@ -25,7 +30,7 @@ export class GameScene extends Phaser.Scene {
     this.furyUntil = 0;
 
     // World bounds = the full level width
-    const level = LEVEL1;
+    const level = this.currentLevel;
     this.physics.world.setBounds(0, 0, level.width, level.height);
     this.cameras.main.setBounds(0, 0, level.width, level.height);
     this.cameras.main.setZoom(1.15);
@@ -61,17 +66,19 @@ export class GameScene extends Phaser.Scene {
     const spawnX = this.currentZoneIdx === 0 ? level.playerSpawn.x : spawnZone.bounds.x + 80;
     const spawnY = level.playerSpawn.y;
 
-    // Players
+    // Players — Jeff is temporarily out of the game. Keep a hidden stub so references work.
     this.mangobob = new Player(this, spawnX, spawnY, 'mangobob');
-    this.jeff = new Player(this, spawnX + 50, spawnY + 10, 'jeff');
+    this.jeff = new Player(this, spawnX + 9999, spawnY, 'jeff');
+    this.jeff.setVisible(false);
+    this.jeff.body.enable = false;
+    this.jeff.isAlive = false;
+    this.jeff.setActive(false);
 
     this.activeKey = 'mangobob';
     this.mangobob.setActiveCharacter(true);
-    this.jeff.setActiveCharacter(false);
-    this.companion = new Companion(this.jeff);
+    this.companion = null;
 
     this.mangobob.on('died', () => this.handleActiveDeath('mangobob'));
-    this.jeff.on('died', () => this.handleActiveDeath('jeff'));
 
     // Groups
     this.enemies = this.physics.add.group({ runChildUpdate: false });
@@ -100,7 +107,7 @@ export class GameScene extends Phaser.Scene {
 
     // Gates physically block players until their zone is cleared
     this.physics.add.collider([this.mangobob, this.jeff], this.gates, (pl, g) => this.showGateHint(pl, g), (pl, g) => {
-      const zIdx = LEVEL1.zones.findIndex((zz) => zz.id === g.zoneId);
+      const zIdx = this.currentLevel.zones.findIndex((zz) => zz.id === g.zoneId);
       return zIdx >= 0 && !this.zoneState[zIdx].cleared;
     }, this);
 
@@ -113,7 +120,7 @@ export class GameScene extends Phaser.Scene {
       UP: 'UP', DOWN: 'DOWN', LEFT: 'LEFT', RIGHT: 'RIGHT',
       SPACE: 'SPACE', E: 'E', F: 'F', R: 'R', SHIFT: 'SHIFT', Q: 'Q', P: 'P', M: 'M', ESC: 'ESC',
     });
-    this.input.keyboard.on('keydown-Q', () => this.swapCharacters());
+    // Q swap disabled while Jeff is out of the lineup
     this.input.keyboard.on('keydown-P', () => this.togglePause());
     this.input.keyboard.on('keydown-R', () => this.tryActivateFury());
     this.input.keyboard.on('keydown-M', () => { Sound.toggleMute(); });
@@ -136,16 +143,17 @@ export class GameScene extends Phaser.Scene {
 
   drawFloor(level) {
     const tile = 32;
+    const baseFloor = level.floorTile || 'grass';
+    const accent = level.accentTile || 'path';
     for (let x = 0; x < level.width; x += tile) {
       for (let y = 0; y < level.height; y += tile) {
-        // Path through middle row-ish
         const isPath = y >= 288 && y < 352;
-        this.add.image(x + tile / 2, y + tile / 2, isPath ? 'path' : 'grass').setDepth(0);
+        this.add.image(x + tile / 2, y + tile / 2, isPath ? accent : baseFloor).setDepth(0);
       }
     }
-    // Zone tint overlays for visual distinction
-    const overlay2 = this.add.rectangle(960 + 480, 320, 960, 640, 0x804020, 0.06).setDepth(0.5);
-    const overlay3 = this.add.rectangle(1920 + 480, 320, 960, 640, 0x400030, 0.12).setDepth(0.5);
+    // Zone tint overlays for visual distinction (same pattern regardless of level)
+    this.add.rectangle(960 + 480, 320, 960, 640, 0x804020, 0.06).setDepth(0.5);
+    this.add.rectangle(1920 + 480, 320, 960, 640, 0x400030, 0.12).setDepth(0.5);
   }
 
   placeObstacle(o) {
@@ -154,9 +162,12 @@ export class GameScene extends Phaser.Scene {
     if (o.type === 'tree') {
       sprite.body.setSize(sprite.width * 0.4, sprite.height * 0.25);
       sprite.body.setOffset(sprite.width * 0.3, sprite.height * 0.7);
-    } else if (o.type === 'rock') {
+    } else if (o.type === 'rock' || o.type === 'metal-crate') {
       sprite.body.setSize(sprite.width * 0.85, sprite.height * 0.7);
       sprite.body.setOffset(sprite.width * 0.08, sprite.height * 0.2);
+    } else if (o.type === 'pipe') {
+      sprite.body.setSize(sprite.width * 0.75, sprite.height * 0.85);
+      sprite.body.setOffset(sprite.width * 0.12, sprite.height * 0.1);
     }
     sprite.refreshBody();
   }
@@ -188,7 +199,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   enteredZone(idx, isFirst = false) {
-    const level = LEVEL1;
+    const level = this.currentLevel;
     const zone = level.zones[idx];
     if (!zone) return;
 
@@ -216,13 +227,14 @@ export class GameScene extends Phaser.Scene {
   }
 
   runWave(zoneIdx, waveIdx) {
-    const zone = LEVEL1.zones[zoneIdx];
+    const zone = this.currentLevel.zones[zoneIdx];
     const wave = zone.waves[waveIdx];
     if (!wave) return;
     const zs = this.zoneState[zoneIdx];
     wave.spawns.forEach((s) => {
-      if (s.type === 'monkey') {
-        const m = new Monkey(this, s.x, s.y);
+      if (s.type === 'monkey' || s.type === 'small-monkey' || s.type === 'big-monkey') {
+        const variant = s.type === 'small-monkey' ? 'small' : s.type === 'big-monkey' ? 'big' : 'normal';
+        const m = new Monkey(this, s.x, s.y, variant);
         this.enemies.add(m);
         m.zoneIdx = zoneIdx;
         zs.totalSpawned++;
@@ -232,7 +244,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   onZoneInitialCleared(zoneIdx) {
-    const zone = LEVEL1.zones[zoneIdx];
+    const zone = this.currentLevel.zones[zoneIdx];
     const zs = this.zoneState[zoneIdx];
     if (zs.clearedInitial) return;
     zs.clearedInitial = true;
@@ -253,7 +265,7 @@ export class GameScene extends Phaser.Scene {
     // Open gate
     let gateFound = false;
     this.gates.getChildren().forEach((g) => {
-      if (g.zoneId === LEVEL1.zones[zoneIdx].id) {
+      if (g.zoneId === this.currentLevel.zones[zoneIdx].id) {
         gateFound = true;
         this.tweens.add({
           targets: g,
@@ -271,7 +283,8 @@ export class GameScene extends Phaser.Scene {
     // Save progress
     this.save = SaveSystem.save({
       ...this.save,
-      zone: Math.min(LEVEL1.zones.length, zoneIdx + 2),
+      levelId: this.currentLevelId,
+      zone: Math.min(this.currentLevel.zones.length, zoneIdx + 2),
       mangoesCollected: this.mangoesCollected,
       mangobobLives: this.mangobobLives,
       jeffLives: this.jeffLives,
@@ -305,8 +318,10 @@ export class GameScene extends Phaser.Scene {
     };
 
     active.update(time, delta, input);
-    companion.update(time, delta, null);
-    this.companion.update(active, time, delta);
+    if (this.companion && companion && companion !== active) {
+      companion.update(time, delta, null);
+      this.companion.update(active, time, delta);
+    }
 
     if (Phaser.Input.Keyboard.JustDown(this.keys.SPACE)) this.tryPrimary(active, time);
     if (Phaser.Input.Keyboard.JustDown(this.keys.E)) this.trySecondary(active, time);
@@ -323,9 +338,9 @@ export class GameScene extends Phaser.Scene {
     if (this.furyActive && time > this.furyUntil) this.deactivateFury();
 
     // Zone transition: detect based on active char x
-    const curZone = LEVEL1.zones[this.currentZoneIdx];
+    const curZone = this.currentLevel.zones[this.currentZoneIdx];
     if (curZone) {
-      const nextIdx = LEVEL1.zones.findIndex((z) =>
+      const nextIdx = this.currentLevel.zones.findIndex((z) =>
         active.x >= z.bounds.x && active.x < z.bounds.x + z.bounds.width
       );
       if (nextIdx !== -1 && nextIdx !== this.currentZoneIdx) {
@@ -587,7 +602,7 @@ export class GameScene extends Phaser.Scene {
   spawnBoss(zone) {
     const boss = new Boss(this, zone.bounds.x + zone.bounds.width / 2, zone.bounds.y + 240);
     this.bossGroup.add(boss);
-    boss.zoneIdx = LEVEL1.zones.indexOf(zone);
+    boss.zoneIdx = this.currentLevel.zones.indexOf(zone);
     this.events.emit('boss-appeared', boss);
     Sound.bossRoar();
     this.cameras.main.shake(400, 0.01);
@@ -668,14 +683,60 @@ export class GameScene extends Phaser.Scene {
       ...this.save, bossDefeated: true,
       mangobobLives: this.mangobobLives, jeffLives: this.jeffLives,
       mangoesCollected: this.mangoesCollected,
+      levelId: this.currentLevelId,
     });
-    this.time.delayedCall(1400, () => {
-      this.scene.stop('UI');
-      this.scene.start('Victory', {
-        mangoes: this.mangoesCollected,
-        mangobobLives: this.mangobobLives,
-        jeffLives: this.jeffLives,
+
+    if (this.currentLevelId === 1) {
+      // Spawn the factory door for transition to Level 2
+      this.time.delayedCall(1400, () => this.spawnLevelTransitionDoor());
+    } else {
+      // Level 2 boss (or any further level) → Victory
+      this.time.delayedCall(1400, () => {
+        this.scene.stop('UI');
+        this.scene.start('Victory', {
+          mangoes: this.mangoesCollected,
+          mangobobLives: this.mangobobLives,
+          jeffLives: this.jeffLives,
+        });
       });
+    }
+  }
+
+  spawnLevelTransitionDoor() {
+    const zone = this.currentLevel.zones[this.currentZoneIdx];
+    const dx = zone.bounds.x + zone.bounds.width / 2;
+    const dy = zone.bounds.y + 200;
+    const door = this.physics.add.staticImage(dx, dy, 'factory-door').setDepth(5);
+    door.isTransitionDoor = true;
+
+    // Beam of light behind the door to draw the eye
+    const beam = this.add.rectangle(dx, dy, 140, 200, 0xffd070, 0.25).setDepth(4);
+    this.tweens.add({ targets: beam, alpha: { from: 0.15, to: 0.45 }, duration: 700, yoyo: true, repeat: -1 });
+
+    // Floating label above the door
+    const hint = this.add.text(dx, dy - 70, 'MANGO FACTORY', {
+      fontFamily: 'Trebuchet MS', fontSize: '20px', fontStyle: 'bold',
+      color: '#ffb347', stroke: '#3a2510', strokeThickness: 5,
+    }).setOrigin(0.5).setDepth(100);
+    this.tweens.add({ targets: hint, y: dy - 85, yoyo: true, duration: 900, repeat: -1 });
+
+    this.physics.add.overlap(this.mangobob, door, () => this.enterLevel2(), null, this);
+
+    // Play a door-open chime
+    Sound.gateOpen();
+    this.cameras.main.flash(300, 255, 220, 120);
+  }
+
+  enterLevel2() {
+    if (this._transitioning) return;
+    this._transitioning = true;
+    Sound.zoneCleared();
+    this.cameras.main.fadeOut(500, 0, 0, 0);
+    this.cameras.main.once('camerafadeoutcomplete', () => {
+      this.save = SaveSystem.save({ ...this.save, levelId: 2, zone: 1 });
+      this.scene.stop('UI');
+      this.scene.start('Game', { level: 2, zoneIdx: 0 });
+      this.scene.launch('UI');
     });
   }
 
@@ -709,53 +770,24 @@ export class GameScene extends Phaser.Scene {
   }
 
   handleActiveDeath(key) {
-    const dead = key === 'mangobob' ? this.mangobob : this.jeff;
-    const other = key === 'mangobob' ? this.jeff : this.mangobob;
-    const livesKey = key === 'mangobob' ? 'mangobobLives' : 'jeffLives';
+    if (key !== 'mangobob') return; // Jeff is out of the lineup
+    const dead = this.mangobob;
 
     dead.setVisible(false);
     dead.body.enable = false;
-
-    // Decrement THIS character's personal lives
-    this[livesKey] = Math.max(0, this[livesKey] - 1);
+    this.mangobobLives = Math.max(0, this.mangobobLives - 1);
     this.save = SaveSystem.save({
       ...this.save,
       mangobobLives: this.mangobobLives,
       jeffLives: this.jeffLives,
     });
 
-    // If they were the active character and the partner is still alive, swap to partner
-    if (this.activeKey === key && other.isAlive) {
-      this.activeKey = key === 'mangobob' ? 'jeff' : 'mangobob';
-      this.mangobob.setActiveCharacter(this.activeKey === 'mangobob');
-      this.jeff.setActiveCharacter(this.activeKey === 'jeff');
-      this.cameras.main.startFollow(this.getActive(), true, 0.12, 0.12);
-      this.companion = new Companion(this.getCompanion());
-    }
-
     this.events.emit('hud-refresh', this.getHudState());
 
-    if (other.isAlive) {
-      // Partner still fighting — auto-revive this one if they have lives left
-      if (this[livesKey] > 0) {
-        this.time.delayedCall(5000, () => {
-          if (!dead.isAlive && this[livesKey] > 0 && other.isAlive) {
-            const active = this.getActive();
-            dead.revive(active.x + 40, active.y + 20);
-            this.events.emit('hud-refresh', this.getHudState());
-          }
-        });
-      }
-      // Else: they sit out permanently, partner plays solo
-      return;
-    }
-
-    // Both down now.
-    if (this.pendingWipe) return; // debounce if both died in the same frame
+    if (this.pendingWipe) return;
     this.pendingWipe = true;
 
-    const bothOut = this.mangobobLives <= 0 && this.jeffLives <= 0;
-    if (bothOut) {
+    if (this.mangobobLives <= 0) {
       this.time.delayedCall(900, () => {
         this.scene.stop('UI');
         this.scene.start('GameOver', { mangoes: this.mangoesCollected });
@@ -769,25 +801,14 @@ export class GameScene extends Phaser.Scene {
   }
 
   respawnAtZoneStart() {
-    const zone = LEVEL1.zones[this.currentZoneIdx];
-    const x = this.currentZoneIdx === 0 ? LEVEL1.playerSpawn.x : zone.bounds.x + 80;
-    const y = LEVEL1.playerSpawn.y;
+    const zone = this.currentLevel.zones[this.currentZoneIdx];
+    const x = this.currentZoneIdx === 0 ? this.currentLevel.playerSpawn.x : zone.bounds.x + 80;
+    const y = this.currentLevel.playerSpawn.y;
 
-    let firstUp = null;
-    if (this.mangobobLives > 0) {
-      this.mangobob.revive(x, y);
-      firstUp = 'mangobob';
-    }
-    if (this.jeffLives > 0) {
-      this.jeff.revive(x + (firstUp ? 50 : 0), y + (firstUp ? 10 : 0));
-      if (!firstUp) firstUp = 'jeff';
-    }
-
-    this.activeKey = firstUp;
-    this.mangobob.setActiveCharacter(this.activeKey === 'mangobob');
-    this.jeff.setActiveCharacter(this.activeKey === 'jeff');
-    this.companion = new Companion(this.getCompanion());
-    this.cameras.main.startFollow(this.getActive(), true, 0.12, 0.12);
+    this.mangobob.revive(x, y);
+    this.mangobob.setActiveCharacter(true);
+    this.activeKey = 'mangobob';
+    this.cameras.main.startFollow(this.mangobob, true, 0.12, 0.12);
     this.cameras.main.flash(200, 255, 220, 140);
     this.events.emit('hud-refresh', this.getHudState());
   }
@@ -799,7 +820,7 @@ export class GameScene extends Phaser.Scene {
       mangobob: { hp: this.mangobob.health, max: this.mangobob.maxHealth, alive: this.mangobob.isAlive, lives: this.mangobobLives },
       jeff: { hp: this.jeff.health, max: this.jeff.maxHealth, alive: this.jeff.isAlive, lives: this.jeffLives },
       mangoes: this.mangoesCollected,
-      zoneName: LEVEL1.zones[this.currentZoneIdx]?.name || '',
+      zoneName: `${this.currentLevel.name || ''} \u2022 ${this.currentLevel.zones[this.currentZoneIdx]?.name || ''}`,
       boss: boss && boss.active ? { hp: boss.health, max: boss.maxHealth } : null,
       fury: {
         charge: this.furyCharge,

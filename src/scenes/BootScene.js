@@ -1,3 +1,5 @@
+import { Sound, SOUND_KEYS } from '../systems/Sound.js';
+
 // Generates all placeholder art procedurally so we have zero asset dependencies.
 // Every texture created here can later be replaced by a real sprite PNG with the same key.
 
@@ -6,9 +8,12 @@ export class BootScene extends Phaser.Scene {
 
   preload() {
     this.load.image('mangobob', 'assets/mangobob.png');
+    SOUND_KEYS.forEach((k) => this.load.audio(k, `assets/sounds/${k}.ogg`));
   }
 
   create() {
+    Sound.attach(this.sound);
+
     // Real art loaded for mangobob in preload; fall back to procedural only if missing
     if (!this.textures.exists('mangobob')) this.makeMangoBob();
     this.makeJeff();
@@ -29,6 +34,11 @@ export class BootScene extends Phaser.Scene {
     this.makeHeart();
     this.makeMangoClub();
     this.makeFuryGlow();
+    this.makeFactoryFloor();
+    this.makeFactoryBelt();
+    this.makeMetalCrate();
+    this.makePipe();
+    this.makeFactoryDoor();
     this.makePixel();
 
     this.scene.start('Title');
@@ -251,6 +261,63 @@ export class BootScene extends Phaser.Scene {
       g.fillCircle(14, 6, 5);
       g.fillTriangle(1, 7, 19, 7, 10, 17);
       g.fillStyle(0xff6a6a, 1).fillCircle(5, 5, 2);
+    });
+  }
+
+  makeFactoryFloor() {
+    this.bake('factory-floor', 32, 32, (g) => {
+      g.fillStyle(0x5a5560, 1).fillRect(0, 0, 32, 32);
+      g.fillStyle(0x6a6570, 1).fillRect(2, 2, 28, 28);
+      g.fillStyle(0x3a3540, 1).fillRect(0, 14, 32, 2).fillRect(14, 0, 2, 32);
+      g.fillStyle(0x8a8595, 1).fillRect(4, 4, 2, 2).fillRect(26, 26, 2, 2);
+    });
+  }
+
+  makeFactoryBelt() {
+    this.bake('factory-belt', 32, 32, (g) => {
+      g.fillStyle(0x2a2530, 1).fillRect(0, 0, 32, 32);
+      g.fillStyle(0xd4a017, 1).fillRect(0, 4, 32, 2).fillRect(0, 20, 32, 2);
+      g.fillStyle(0xffb347, 1).fillRect(4, 10, 8, 8).fillRect(20, 10, 8, 8);
+      g.fillStyle(0x3a3540, 1).fillRect(14, 12, 4, 4);
+    });
+  }
+
+  makeMetalCrate() {
+    this.bake('metal-crate', 36, 36, (g) => {
+      g.fillStyle(0x7a7580, 1).fillRoundedRect(0, 0, 36, 36, 3);
+      g.fillStyle(0x5a5560, 1).fillRect(2, 2, 32, 32);
+      g.fillStyle(0x9a95a0, 1).fillRect(3, 3, 30, 4);
+      g.fillStyle(0x3a3540, 1).fillRect(0, 16, 36, 2).fillRect(16, 0, 2, 36);
+      g.fillStyle(0xd4a017, 1).fillCircle(18, 18, 3);
+      g.fillStyle(0xff9b2a, 1).fillCircle(18, 18, 2);
+    });
+  }
+
+  makePipe() {
+    this.bake('pipe', 36, 48, (g) => {
+      g.fillStyle(0x5a5560, 1).fillRoundedRect(4, 0, 28, 48, 4);
+      g.fillStyle(0x7a7580, 1).fillRect(6, 4, 24, 40);
+      g.fillStyle(0x3a3540, 1).fillRect(4, 8, 28, 3).fillRect(4, 20, 28, 3).fillRect(4, 36, 28, 3);
+      g.fillStyle(0x9a95a0, 1).fillRect(8, 10, 2, 8).fillRect(8, 22, 2, 8);
+    });
+  }
+
+  makeFactoryDoor() {
+    this.bake('factory-door', 96, 80, (g) => {
+      // Door frame
+      g.fillStyle(0x3a3540, 1).fillRect(0, 0, 96, 80);
+      g.fillStyle(0x5a5560, 1).fillRect(4, 4, 88, 72);
+      // Door split
+      g.fillStyle(0x2a2530, 1).fillRect(46, 4, 4, 72);
+      // Warning stripes
+      g.fillStyle(0xd4a017, 1);
+      for (let i = 0; i < 5; i++) g.fillRect(8 + i * 18, 0, 10, 4);
+      for (let i = 0; i < 5; i++) g.fillRect(8 + i * 18, 76, 10, 4);
+      // Window
+      g.fillStyle(0xffb347, 0.6).fillRect(20, 20, 20, 20).fillRect(56, 20, 20, 20);
+      // "MANGO FACTORY" hint: mango icon center-top
+      g.fillStyle(0xff9b2a, 1).fillCircle(48, 48, 5);
+      g.fillStyle(0x2d6b1e, 1).fillRect(47, 42, 2, 3);
     });
   }
 

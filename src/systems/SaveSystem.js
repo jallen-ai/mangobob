@@ -3,6 +3,7 @@ const KEY = 'mangobob-save-v1';
 const defaultSave = () => ({
   mangobobLives: 3,
   jeffLives: 3,
+  levelId: 1,
   zone: 1,
   mangoesCollected: 0,
   bossDefeated: false,

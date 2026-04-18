@@ -3,6 +3,10 @@
 // Tile size 32; world is built as a large area we scroll over.
 
 export const LEVEL1 = {
+  id: 1,
+  name: 'Jungle',
+  floorTile: 'grass',
+  accentTile: 'path',
   width: 2880,
   height: 640,
   playerSpawn: { x: 90, y: 320 },
@@ -22,7 +26,11 @@ export const LEVEL1 = {
         { type: 'crate', x: 740, y: 300 },
       ],
       waves: [
-        { delay: 700, spawns: [{ type: 'monkey', x: 600, y: 200 }, { type: 'monkey', x: 700, y: 460 }] },
+        { delay: 700, spawns: [
+          { type: 'small-monkey', x: 600, y: 200 },
+          { type: 'small-monkey', x: 700, y: 460 },
+          { type: 'monkey', x: 650, y: 330 },
+        ] },
       ],
     },
     {
@@ -42,8 +50,17 @@ export const LEVEL1 = {
         { type: 'rock', x: 1820, y: 460 },
       ],
       waves: [
-        { delay: 700, spawns: [{ type: 'monkey', x: 1200, y: 200 }, { type: 'monkey', x: 1200, y: 460 }] },
-        { delay: 0, afterCleared: true, spawns: [{ type: 'monkey', x: 1700, y: 160 }, { type: 'monkey', x: 1700, y: 480 }, { type: 'monkey', x: 1550, y: 320 }] },
+        { delay: 700, spawns: [
+          { type: 'monkey', x: 1200, y: 200 },
+          { type: 'small-monkey', x: 1200, y: 460 },
+          { type: 'small-monkey', x: 1100, y: 320 },
+        ] },
+        { delay: 0, afterCleared: true, spawns: [
+          { type: 'big-monkey', x: 1700, y: 320 },
+          { type: 'monkey', x: 1700, y: 160 },
+          { type: 'monkey', x: 1700, y: 480 },
+          { type: 'small-monkey', x: 1550, y: 320 },
+        ] },
       ],
     },
     {
