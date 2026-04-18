@@ -22,7 +22,7 @@ export class VictoryScene extends Phaser.Scene {
     this.add.text(GAME_WIDTH / 2, 450, `Golden Mangoes Collected: ${data?.mangoes || 0}`, {
       fontFamily: 'Trebuchet MS', fontSize: '22px', color: '#ffe24a',
     }).setOrigin(0.5);
-    this.add.text(GAME_WIDTH / 2, 482, `Lives Remaining: ${data?.lives || 0}`, {
+    this.add.text(GAME_WIDTH / 2, 482, `MangoBob Lives: ${data?.mangobobLives ?? 0}   \u00b7   Jeff Lives: ${data?.jeffLives ?? 0}`, {
       fontFamily: 'Trebuchet MS', fontSize: '18px', color: '#f5e6c8',
     }).setOrigin(0.5);
 

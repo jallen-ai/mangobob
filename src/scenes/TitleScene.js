@@ -46,7 +46,7 @@ export class TitleScene extends Phaser.Scene {
     const buttons = [];
     if (hasSave) {
       buttons.push({
-        label: `CONTINUE  (Zone ${save.zone} \u2022 ${save.lives}\u00a0lives)`,
+        label: `CONTINUE  (Zone ${save.zone} \u2022 MB ${save.mangobobLives}\u2665 Jeff ${save.jeffLives}\u2665)`,
         action: () => this.startGame(false),
       });
       buttons.push({ label: 'NEW GAME', action: () => this.startGame(true) });

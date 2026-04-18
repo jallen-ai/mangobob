@@ -11,7 +11,8 @@ export class GameScene extends Phaser.Scene {
 
   create() {
     this.save = SaveSystem.load();
-    this.lives = this.save.lives;
+    this.mangobobLives = this.save.mangobobLives;
+    this.jeffLives = this.save.jeffLives;
     this.mangoesCollected = this.save.mangoesCollected;
     this.currentZoneIdx = Math.max(0, this.save.zone - 1);
     this.paused = false;
@@ -266,7 +267,8 @@ export class GameScene extends Phaser.Scene {
       ...this.save,
       zone: Math.min(LEVEL1.zones.length, zoneIdx + 2),
       mangoesCollected: this.mangoesCollected,
-      lives: this.lives,
+      mangobobLives: this.mangobobLives,
+      jeffLives: this.jeffLives,
     });
 
     this.cameras.main.flash(180, 255, 200, 100);
@@ -643,10 +645,18 @@ export class GameScene extends Phaser.Scene {
   }
 
   onBossDefeated() {
-    this.save = SaveSystem.save({ ...this.save, bossDefeated: true, lives: this.lives, mangoesCollected: this.mangoesCollected });
+    this.save = SaveSystem.save({
+      ...this.save, bossDefeated: true,
+      mangobobLives: this.mangobobLives, jeffLives: this.jeffLives,
+      mangoesCollected: this.mangoesCollected,
+    });
     this.time.delayedCall(1400, () => {
       this.scene.stop('UI');
-      this.scene.start('Victory', { mangoes: this.mangoesCollected, lives: this.lives });
+      this.scene.start('Victory', {
+        mangoes: this.mangoesCollected,
+        mangobobLives: this.mangobobLives,
+        jeffLives: this.jeffLives,
+      });
     });
   }
 
@@ -678,57 +688,84 @@ export class GameScene extends Phaser.Scene {
   }
 
   handleActiveDeath(key) {
-    // If both dead: lose a life
-    const otherAlive = (key === 'mangobob' ? this.jeff : this.mangobob).isAlive;
-
-    // Make the dead one invisible / disabled
     const dead = key === 'mangobob' ? this.mangobob : this.jeff;
+    const other = key === 'mangobob' ? this.jeff : this.mangobob;
+    const livesKey = key === 'mangobob' ? 'mangobobLives' : 'jeffLives';
+
     dead.setVisible(false);
     dead.body.enable = false;
 
-    if (otherAlive) {
-      // Auto-swap to the alive one
-      if (this.activeKey === key) {
-        this.activeKey = key === 'mangobob' ? 'jeff' : 'mangobob';
-        this.mangobob.setActiveCharacter(this.activeKey === 'mangobob');
-        this.jeff.setActiveCharacter(this.activeKey === 'jeff');
-        this.cameras.main.startFollow(this.getActive(), true, 0.12, 0.12);
+    // Decrement THIS character's personal lives
+    this[livesKey] = Math.max(0, this[livesKey] - 1);
+    this.save = SaveSystem.save({
+      ...this.save,
+      mangobobLives: this.mangobobLives,
+      jeffLives: this.jeffLives,
+    });
+
+    // If they were the active character and the partner is still alive, swap to partner
+    if (this.activeKey === key && other.isAlive) {
+      this.activeKey = key === 'mangobob' ? 'jeff' : 'mangobob';
+      this.mangobob.setActiveCharacter(this.activeKey === 'mangobob');
+      this.jeff.setActiveCharacter(this.activeKey === 'jeff');
+      this.cameras.main.startFollow(this.getActive(), true, 0.12, 0.12);
+      this.companion = new Companion(this.getCompanion());
+    }
+
+    this.events.emit('hud-refresh', this.getHudState());
+
+    if (other.isAlive) {
+      // Partner still fighting — auto-revive this one if they have lives left
+      if (this[livesKey] > 0) {
+        this.time.delayedCall(5000, () => {
+          if (!dead.isAlive && this[livesKey] > 0 && other.isAlive) {
+            const active = this.getActive();
+            dead.revive(active.x + 40, active.y + 20);
+            this.events.emit('hud-refresh', this.getHudState());
+          }
+        });
       }
-      // Revive the fallen one after a cooldown
-      this.time.delayedCall(5000, () => {
-        if (!dead.isAlive && this.lives > 0) {
-          const active = this.getActive();
-          dead.revive(active.x + 40, active.y + 20);
-        }
+      // Else: they sit out permanently, partner plays solo
+      return;
+    }
+
+    // Both down now.
+    if (this.pendingWipe) return; // debounce if both died in the same frame
+    this.pendingWipe = true;
+
+    const bothOut = this.mangobobLives <= 0 && this.jeffLives <= 0;
+    if (bothOut) {
+      this.time.delayedCall(900, () => {
+        this.scene.stop('UI');
+        this.scene.start('GameOver', { mangoes: this.mangoesCollected });
       });
     } else {
-      // Lose a life
-      this.lives--;
-      this.save = SaveSystem.save({ ...this.save, lives: this.lives });
-      this.events.emit('hud-refresh', this.getHudState());
-
-      if (this.lives <= 0) {
-        this.time.delayedCall(800, () => {
-          this.scene.stop('UI');
-          this.scene.start('GameOver', { mangoes: this.mangoesCollected });
-        });
-      } else {
-        // Respawn both at start of current zone
-        this.time.delayedCall(1000, () => this.respawnBoth());
-      }
+      this.time.delayedCall(1000, () => {
+        this.pendingWipe = false;
+        this.respawnAtZoneStart();
+      });
     }
   }
 
-  respawnBoth() {
+  respawnAtZoneStart() {
     const zone = LEVEL1.zones[this.currentZoneIdx];
     const x = this.currentZoneIdx === 0 ? LEVEL1.playerSpawn.x : zone.bounds.x + 80;
     const y = LEVEL1.playerSpawn.y;
-    this.mangobob.revive(x, y);
-    this.jeff.revive(x + 50, y + 10);
-    this.activeKey = 'mangobob';
-    this.mangobob.setActiveCharacter(true);
-    this.jeff.setActiveCharacter(false);
-    this.companion = new Companion(this.jeff);
+
+    let firstUp = null;
+    if (this.mangobobLives > 0) {
+      this.mangobob.revive(x, y);
+      firstUp = 'mangobob';
+    }
+    if (this.jeffLives > 0) {
+      this.jeff.revive(x + (firstUp ? 50 : 0), y + (firstUp ? 10 : 0));
+      if (!firstUp) firstUp = 'jeff';
+    }
+
+    this.activeKey = firstUp;
+    this.mangobob.setActiveCharacter(this.activeKey === 'mangobob');
+    this.jeff.setActiveCharacter(this.activeKey === 'jeff');
+    this.companion = new Companion(this.getCompanion());
     this.cameras.main.startFollow(this.getActive(), true, 0.12, 0.12);
     this.cameras.main.flash(200, 255, 220, 140);
     this.events.emit('hud-refresh', this.getHudState());
@@ -738,9 +775,8 @@ export class GameScene extends Phaser.Scene {
     const boss = this.bossGroup.getChildren()[0];
     return {
       activeKey: this.activeKey,
-      mangobob: { hp: this.mangobob.health, max: this.mangobob.maxHealth, alive: this.mangobob.isAlive },
-      jeff: { hp: this.jeff.health, max: this.jeff.maxHealth, alive: this.jeff.isAlive },
-      lives: this.lives,
+      mangobob: { hp: this.mangobob.health, max: this.mangobob.maxHealth, alive: this.mangobob.isAlive, lives: this.mangobobLives },
+      jeff: { hp: this.jeff.health, max: this.jeff.maxHealth, alive: this.jeff.isAlive, lives: this.jeffLives },
       mangoes: this.mangoesCollected,
       zoneName: LEVEL1.zones[this.currentZoneIdx]?.name || '',
       boss: boss && boss.active ? { hp: boss.health, max: boss.maxHealth } : null,

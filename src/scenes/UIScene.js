@@ -4,43 +4,41 @@ export class UIScene extends Phaser.Scene {
   constructor() { super('UI'); }
 
   create() {
-    this.bg = this.add.rectangle(0, 0, GAME_WIDTH, 60, 0x0f1a10, 0.7).setOrigin(0, 0);
+    this.bg = this.add.rectangle(0, 0, GAME_WIDTH, 72, 0x0f1a10, 0.72).setOrigin(0, 0);
 
-    // MangoBob portrait + bar
-    this.mbPortrait = this.add.image(30, 30, 'mangobob').setScale(0.9);
-    this.mbBarBg = this.add.rectangle(56, 22, 140, 10, 0x3a2510).setOrigin(0, 0.5);
-    this.mbBar = this.add.rectangle(57, 22, 138, 8, 0xff6a1a).setOrigin(0, 0.5);
-    this.mbLabel = this.add.text(56, 36, 'MangoBob', { fontFamily: 'Trebuchet MS', fontSize: '11px', color: '#ffb347' }).setOrigin(0, 0);
+    // MangoBob portrait + bar + hearts
+    this.mbPortrait = this.add.image(30, 34, 'mangobob').setScale(0.9);
+    this.mbBarBg = this.add.rectangle(56, 20, 140, 10, 0x3a2510).setOrigin(0, 0.5);
+    this.mbBar = this.add.rectangle(57, 20, 138, 8, 0xff6a1a).setOrigin(0, 0.5);
+    this.mbLabel = this.add.text(56, 30, 'MangoBob', { fontFamily: 'Trebuchet MS', fontSize: '11px', color: '#ffb347' }).setOrigin(0, 0);
+    this.mbHearts = [];
 
-    // Jeff portrait + bar
-    this.jfPortrait = this.add.image(240, 30, 'jeff').setScale(0.9);
-    this.jfBarBg = this.add.rectangle(266, 22, 140, 10, 0x3a2510).setOrigin(0, 0.5);
-    this.jfBar = this.add.rectangle(267, 22, 138, 8, 0x3a72c4).setOrigin(0, 0.5);
-    this.jfLabel = this.add.text(266, 36, 'Jeff', { fontFamily: 'Trebuchet MS', fontSize: '11px', color: '#3a72c4' }).setOrigin(0, 0);
+    // Jeff portrait + bar + hearts
+    this.jfPortrait = this.add.image(260, 34, 'jeff').setScale(0.9);
+    this.jfBarBg = this.add.rectangle(286, 20, 140, 10, 0x3a2510).setOrigin(0, 0.5);
+    this.jfBar = this.add.rectangle(287, 20, 138, 8, 0x3a72c4).setOrigin(0, 0.5);
+    this.jfLabel = this.add.text(286, 30, 'Jeff', { fontFamily: 'Trebuchet MS', fontSize: '11px', color: '#3a72c4' }).setOrigin(0, 0);
+    this.jfHearts = [];
 
-    // Lives
-    this.livesGroup = this.add.container(460, 28);
-    this.livesText = this.add.text(430, 22, 'LIVES', { fontFamily: 'Trebuchet MS', fontSize: '12px', color: '#f5e6c8' }).setOrigin(0, 0.5);
-
-    // Mangoes
-    this.mangoIcon = this.add.image(620, 28, 'golden-mango').setScale(1.1);
-    this.mangoText = this.add.text(638, 28, 'x 0', { fontFamily: 'Trebuchet MS', fontSize: '18px', color: '#ffe24a', stroke: '#3a2510', strokeThickness: 3 }).setOrigin(0, 0.5);
+    // Mangoes (shifted right to make room)
+    this.mangoIcon = this.add.image(480, 34, 'golden-mango').setScale(1.1);
+    this.mangoText = this.add.text(498, 34, 'x 0', { fontFamily: 'Trebuchet MS', fontSize: '18px', color: '#ffe24a', stroke: '#3a2510', strokeThickness: 3 }).setOrigin(0, 0.5);
 
     // Fury meter
-    this.furyLabel = this.add.text(700, 14, 'FURY', { fontFamily: 'Trebuchet MS', fontSize: '11px', color: '#ffb347' }).setOrigin(0, 0);
+    this.furyLabel = this.add.text(600, 16, 'FURY', { fontFamily: 'Trebuchet MS', fontSize: '11px', color: '#ffb347' }).setOrigin(0, 0);
     this.furyPips = [];
     for (let i = 0; i < 5; i++) {
-      const pip = this.add.circle(708 + i * 14, 38, 5, 0x3a2510).setStrokeStyle(1, 0x6b3a1b);
+      const pip = this.add.circle(608 + i * 14, 42, 5, 0x3a2510).setStrokeStyle(1, 0x6b3a1b);
       this.furyPips.push(pip);
     }
-    this.furyTimerBg = this.add.rectangle(700, 38, 70, 8, 0x3a2510).setOrigin(0, 0.5).setVisible(false);
-    this.furyTimerBar = this.add.rectangle(701, 38, 68, 6, 0xffe24a).setOrigin(0, 0.5).setVisible(false);
+    this.furyTimerBg = this.add.rectangle(600, 42, 70, 8, 0x3a2510).setOrigin(0, 0.5).setVisible(false);
+    this.furyTimerBar = this.add.rectangle(601, 42, 68, 6, 0xffe24a).setOrigin(0, 0.5).setVisible(false);
 
     // Zone name
-    this.zoneText = this.add.text(GAME_WIDTH - 20, 28, '', { fontFamily: 'Trebuchet MS', fontSize: '14px', color: '#f5e6c8' }).setOrigin(1, 0.5);
+    this.zoneText = this.add.text(GAME_WIDTH - 20, 36, '', { fontFamily: 'Trebuchet MS', fontSize: '14px', color: '#f5e6c8' }).setOrigin(1, 0.5);
 
     // Active indicator
-    this.activeRing = this.add.circle(30, 30, 20).setStrokeStyle(3, 0xffe24a);
+    this.activeRing = this.add.circle(30, 34, 20).setStrokeStyle(3, 0xffe24a);
 
     // Boss bar (hidden by default)
     this.bossFrame = this.add.rectangle(GAME_WIDTH / 2, GAME_HEIGHT - 40, 720, 32, 0x1a0606).setStrokeStyle(3, 0xffb347);
@@ -59,8 +57,6 @@ export class UIScene extends Phaser.Scene {
     this.pauseText = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2, 'PAUSED', {
       fontFamily: 'Trebuchet MS', fontSize: '64px', color: '#ffb347', stroke: '#3a2510', strokeThickness: 8,
     }).setOrigin(0.5).setVisible(false);
-
-    this.hearts = [];
 
     // Subscribe to Game events
     const gs = this.scene.get('Game');
@@ -111,9 +107,6 @@ export class UIScene extends Phaser.Scene {
     this.mbBar.width = 138 * mbRatio;
     this.jfBar.width = 138 * jfRatio;
 
-    this.mbPortrait.setAlpha(state.mangobob.alive ? 1 : 0.35);
-    this.jfPortrait.setAlpha(state.jeff.alive ? 1 : 0.35);
-
     this.mangoText.setText('x ' + state.mangoes);
     this.zoneText.setText(state.zoneName);
 
@@ -121,12 +114,20 @@ export class UIScene extends Phaser.Scene {
     if (state.activeKey === 'mangobob') this.activeRing.setPosition(this.mbPortrait.x, this.mbPortrait.y);
     else this.activeRing.setPosition(this.jfPortrait.x, this.jfPortrait.y);
 
-    // Hearts
-    this.hearts.forEach((h) => h.destroy());
-    this.hearts = [];
-    for (let i = 0; i < state.lives; i++) {
-      this.hearts.push(this.add.image(485 + i * 22, 28, 'heart').setScale(0.9));
+    // Per-character hearts
+    this.mbHearts.forEach((h) => h.destroy());
+    this.jfHearts.forEach((h) => h.destroy());
+    this.mbHearts = [];
+    this.jfHearts = [];
+    for (let i = 0; i < state.mangobob.lives; i++) {
+      this.mbHearts.push(this.add.image(60 + i * 14, 54, 'heart').setScale(0.55));
     }
+    for (let i = 0; i < state.jeff.lives; i++) {
+      this.jfHearts.push(this.add.image(290 + i * 14, 54, 'heart').setScale(0.55));
+    }
+    // When a character is out of lives, dim their whole section
+    this.mbPortrait.setAlpha(state.mangobob.lives > 0 ? (state.mangobob.alive ? 1 : 0.45) : 0.25);
+    this.jfPortrait.setAlpha(state.jeff.lives > 0 ? (state.jeff.alive ? 1 : 0.45) : 0.25);
 
     // Fury meter
     const f = state.fury;
