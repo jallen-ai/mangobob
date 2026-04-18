@@ -79,7 +79,13 @@ export class TitleScene extends Phaser.Scene {
 
   startGame(reset) {
     if (reset) SaveSystem.reset();
-    this.scene.start('Game');
-    this.scene.launch('UI');
+    const save = SaveSystem.load();
+    // New game (or a save without a chosen weapon) \u2192 weapon select first
+    if (!save.defaultWeapon) {
+      this.scene.start('WeaponSelect');
+    } else {
+      this.scene.start('Game');
+      this.scene.launch('UI');
+    }
   }
 }

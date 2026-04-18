@@ -11,6 +11,8 @@ const defaultSave = () => ({
   wallet: 0,
   // Array of purchased upgrade ids (see Upgrades.js)
   upgrades: [],
+  // Chosen default ranged weapon: 'bazooka' | 'pistols' | 'slingshot'
+  defaultWeapon: null,
   // How many times the player has faced the Rotten Mango King (0..3)
   bossEncounters: 0,
   bossDefeated: false,

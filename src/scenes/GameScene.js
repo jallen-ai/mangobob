@@ -5,6 +5,7 @@ import { Projectile } from '../entities/Projectile.js';
 import { Monkey, Boss } from '../entities/Enemy.js';
 import { SaveSystem } from '../systems/SaveSystem.js';
 import { Sound } from '../systems/Sound.js';
+import { getWeapon } from '../systems/Weapons.js';
 import { LEVEL1 } from '../levels/Level1.js';
 import { LEVEL2 } from '../levels/Level2.js';
 
@@ -470,33 +471,54 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
+  // E key: fires the player's chosen default weapon
   trySecondary(player, time) {
-    if (!player.trySecondary(time)) return;
+    if (player.charKey !== 'mangobob') return;
+    const weaponId = this.save.defaultWeapon || 'slingshot';
+    const w = getWeapon(weaponId);
+
+    if (player.secondaryReady && time < player.secondaryReady) return;
+    player.secondaryReady = time + w.cooldown;
+
     const aim = player.getAimDirection();
-    if (player.charKey === 'mangobob') {
-      this.firePlayerProjectile(player, 'mango', aim, {
-        speed: 360, damage: player.cfg.secondaryDamage, ttl: 1000, scale: 1.3, spin: 8,
+    this.firePlayerProjectile(player, w.texture, aim, {
+      speed: w.speed, damage: w.damage, ttl: w.ttl,
+      splashRadius: w.splashRadius || 0, splashDamage: w.splashDamage || 0,
+      scale: w.scale || 1, spin: w.spin || 0,
+    });
+    Sound[w.sfx] ? Sound[w.sfx]() : Sound.throw();
+
+    if (w.isPair) {
+      // Double pistols: fire a second shot from the other hand ~90ms later
+      this.time.delayedCall(90, () => {
+        const a2 = player.getAimDirection();
+        // Slightly offset perpendicular for visual pair
+        const perp = { x: -a2.y * 0.15, y: a2.x * 0.15 };
+        const offsetAim = { x: a2.x + perp.x, y: a2.y + perp.y };
+        const len = Math.hypot(offsetAim.x, offsetAim.y) || 1;
+        offsetAim.x /= len; offsetAim.y /= len;
+        this.firePlayerProjectile(player, w.texture, offsetAim, {
+          speed: w.speed, damage: w.damage, ttl: w.ttl,
+          scale: w.scale || 1, spin: w.spin || 0,
+        });
+        Sound[w.sfx] ? Sound[w.sfx]() : Sound.throw();
       });
-      Sound.throw();
-    } else {
-      this.firePlayerProjectile(player, 'grenade', aim, {
-        speed: 320, damage: 0, ttl: 900, splashRadius: 78, splashDamage: player.cfg.secondaryDamage,
-        scale: 1.2, spin: 10, explodeOnImpact: true,
-      });
-      Sound.throw();
     }
+
+    if (w.shakeAmount) this.cameras.main.shake(w.shakeDuration, w.shakeAmount);
   }
 
+  // F key: always throws a mango grenade (AOE splash, arcing)
   tryHeavy(player, time) {
-    if (!player.tryHeavy(time)) return;
     if (player.charKey !== 'mangobob') return;
+    if (player.heavyReady && time < player.heavyReady) return;
+    player.heavyReady = time + 900;
     const aim = player.getAimDirection();
-    this.firePlayerProjectile(player, 'bazooka-shot', aim, {
-      speed: 440, damage: player.cfg.heavyDamage, ttl: 1400, splashRadius: 80,
-      splashDamage: Math.floor(player.cfg.heavyDamage * 0.5), scale: 1.5, spin: 0,
+    this.firePlayerProjectile(player, 'grenade', aim, {
+      speed: 320, damage: 0, ttl: 900, splashRadius: 78, splashDamage: 4,
+      scale: 1.2, spin: 10, explodeOnImpact: true,
     });
-    Sound.bazooka();
-    this.cameras.main.shake(120, 0.006);
+    Sound.throw();
   }
 
   meleeHit(player, aim, reach, damage) {
