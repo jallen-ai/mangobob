@@ -27,6 +27,7 @@ export class GameScene extends Phaser.Scene {
     const level = LEVEL1;
     this.physics.world.setBounds(0, 0, level.width, level.height);
     this.cameras.main.setBounds(0, 0, level.width, level.height);
+    this.cameras.main.setZoom(1.15);
 
     // Tiled background
     this.drawFloor(level);
